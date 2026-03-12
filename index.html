@@ -170,7 +170,7 @@
     async function initData() {
         setTimeout(() => document.getElementById('loader-wrapper').classList.add('hidden'), 2500);
         try {
-            const r = await fetch('database.json');
+            const r = await fetch('routes.json');
             allRoutes = await r.json();
             document.getElementById('dot-db').classList.add('dot-green');
         } catch (e) { console.error("DB error"); }
@@ -242,3 +242,4 @@
 </script>
 </body>
 </html>
+
