@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8" />
+    <title>Route Master - PROHLÍŽEČ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --accent: #1d4ed8; --dark: #003399; --border: #e2e8f0; --bg: #f8fafc; }
+        body { margin: 0; font-family: 'IBM Plex Sans', sans-serif; display: flex; height: 100vh; overflow: hidden; background: var(--bg); }
+        
+        #panel { width: 420px; border-right: 1px solid var(--border); background: white; display: flex; flex-direction: column; z-index: 1000; box-shadow: 4px 0 15px rgba(0,0,0,0.05); }
+        .tab-nav { background: var(--accent); padding: 15px; color: white; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 1px; }
+        .section { padding: 20px; border-bottom: 1px solid var(--border); }
+        h1 { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 15px 0; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; }
+        h1::before { content: ''; width: 3px; height: 12px; background: var(--accent); border-radius: 2px; }
+        
+        .btn { width: 100%; padding: 12px; cursor: pointer; border-radius: 8px; border: none; font-weight: 600; font-size: 13px; transition: 0.2s; background: var(--accent); color: white; }
+        .btn:hover { filter: brightness(1.1); }
+        .btn-init { background: #64748b; margin-bottom: 5px; }
+        
+        .route-item { padding: 15px 20px; border-bottom: 1px solid var(--border); cursor: pointer; transition: 0.2s; border-left: 4px solid transparent; }
+        .route-item:hover { background: #f8fafc; }
+        .route-item.active { background: #eff6ff; border-left: 4px solid var(--accent); }
+        
+        #map { flex-grow: 1; z-index: 1; background: #cbd5e1; position: relative; }
+        #dept-status { font-size: 10px; margin-top: 5px; color: #64748b; font-weight: 600; }
+
+        /* Plovoucí Info Box (místo popupu) */
+        #route-info-box {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            background: white;
+            z-index: 2000;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            display: none; /* Schovaný, dokud se neklikne na trasu */
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .p-container { padding: 20px; }
+        .p-header { border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-start; }
+        .p-title { color: var(--dark); font-weight: 700; font-size: 16px; line-height: 1.2; }
+        .p-close { cursor: pointer; color: #94a3b8; font-size: 20px; line-height: 1; }
+        .p-row { display: flex; align-items: center; margin-bottom: 10px; font-size: 13px; color: #334155; }
+        .p-icon { width: 28px; font-size: 16px; }
+        .p-note { background: #f8fafc; border-radius: 8px; padding: 12px; font-size: 12px; color: #475569; margin-top: 12px; border-left: 4px solid #cbd5e1; line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+<div id="panel">
+    <div class="tab-nav">PROHLÍŽEČ TRAS</div>
+    <div class="section">
+        <h1>1. Databáze tras</h1>
+        <input type="file" id="file-selector" accept=".json">
+    </div>
+    <div class="section">
+        <h1>2. Mapové podklady</h1>
+        <div id="dept-init-container">
+            <button class="btn btn-init" onclick="document.getElementById('geo-init').click()">📍 NAČÍST HRANICE DEPT</button>
+            <input type="file" id="geo-init" style="display:none" accept=".geojson,.json">
+        </div>
+        <div id="dept-status">Hranice nejsou načteny.</div>
+    </div>
+    <div class="section">
+        <h1>3. Vyhledávání</h1>
+        <div style="display:flex; gap: 5px;">
+            <input type="text" id="viewerDept" placeholder="Dept (např. 85)" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:8px;">
+            <button class="btn" style="width:auto; margin:0; padding:0 15px;" onclick="filterByDept()">ZOBRAZIT</button>
+        </div>
+    </div>
+    <div id="route-list" style="flex-grow:1; overflow-y:auto;"></div>
+</div>
+
+<div id="map">
+    <div id="route-info-box">
+        <div class="p-container">
+            <div class="p-header">
+                <span id="info-title" class="p-title">Název trasy</span>
+                <span class="p-close" onclick="closeInfoBox()">&times;</span>
+            </div>
+            <div class="p-row">
+                <span class="p-icon">📏</span>
+                <span><b>Vzdálenost:</b> <span id="info-dist">---</span> km</span>
+            </div>
+            <div class="p-row">
+                <span class="p-icon">💶</span>
+                <span><b>Cena:</b> <span id="info-price">---</span> €</span>
+            </div>
+            <div id="info-note-container" class="p-note">
+                <b>Poznámka:</b><br><span id="info-note">---</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let allRoutes = [];
+    let franceBorders = null;
+    
+    const map = L.map('map', { zoomControl: false }).setView([46.6, 2.2], 6);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+    
+    let routeLayers = L.layerGroup().addTo(map);
+    let highlightLayer = L.layerGroup().addTo(map);
+    let borderLayer = L.layerGroup().addTo(map);
+
+    document.getElementById('geo-init').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                franceBorders = JSON.parse(e.target.result);
+                document.getElementById('dept-status').innerHTML = '<span style="color:#059669">● Hranice připraveny</span>';
+                document.getElementById('dept-init-container').style.display = 'none';
+            } catch (err) { alert('Chyba při čtení GeoJSONu.'); }
+        };
+        reader.readAsText(file);
+    });
+
+    document.getElementById('file-selector').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                allRoutes = JSON.parse(e.target.result);
+                alert('Trasy načteny: ' + allRoutes.length);
+            } catch (err) { alert('Chyba při čtení databáze.'); }
+        };
+        reader.readAsText(file);
+    });
+
+    function filterByDept() {
+        const deptInput = document.getElementById('viewerDept').value.trim();
+        const deptClean = deptInput.padStart(2, '0');
+        const container = document.getElementById('route-list');
+        
+        container.innerHTML = '';
+        routeLayers.clearLayers();
+        highlightLayer.clearLayers();
+        borderLayer.clearLayers();
+        closeInfoBox();
+
+        if (franceBorders) {
+            const deptShape = franceBorders.features.find(f => f.properties.code === deptInput || f.properties.code === deptClean);
+            if (deptShape) {
+                L.geoJSON(deptShape, {
+                    style: { color: '#1d4ed8', weight: 2, fillOpacity: 0.04, dashArray: '5, 5' }
+                }).addTo(borderLayer);
+            }
+        }
+
+        const filtered = allRoutes.filter(r => r.dept === deptInput || r.dept === deptClean);
+        if (filtered.length === 0) return;
+
+        const groupBounds = L.latLngBounds();
+
+        filtered.forEach(r => {
+            const div = document.createElement('div');
+            div.className = 'route-item';
+            div.innerHTML = `<strong>${r.name}</strong><br><small>${r.distance} km</small>`;
+            div.onclick = () => activateRoute(r, div);
+            container.appendChild(div);
+
+            L.geoJSON(r.geometry, { style: { color: '#000', weight: 7, opacity: 0.15 } }).addTo(routeLayers);
+            const ghost = L.geoJSON(r.geometry, { 
+                style: { color: '#fff', weight: 5, opacity: 1, cursor: 'pointer' } 
+            }).addTo(routeLayers);
+
+            groupBounds.extend(ghost.getBounds());
+            ghost.on('click', () => activateRoute(r, div));
+        });
+
+        map.flyToBounds(groupBounds, { padding: [50, 50], duration: 1.5 });
+    }
+
+    function activateRoute(r, element) {
+        document.querySelectorAll('.route-item').forEach(el => el.classList.remove('active'));
+        element.classList.add('active');
+        showRouteOnMap(r);
+    }
+
+    function showRouteOnMap(r) {
+        highlightLayer.clearLayers();
+
+        const activeLayer = L.geoJSON(r.geometry, { 
+            style: { color: '#003399', weight: 8, opacity: 1, lineJoin: 'round' } 
+        }).addTo(highlightLayer);
+
+        // Naplnění a zobrazení Info Boxu místo Popupup
+        document.getElementById('info-title').innerText = r.name;
+        document.getElementById('info-dist').innerText = r.distance;
+        document.getElementById('info-price').innerText = r.price || '---';
+        
+        if (r.note) {
+            document.getElementById('info-note').innerText = r.note;
+            document.getElementById('info-note-container').style.display = 'block';
+        } else {
+            document.getElementById('info-note-container').style.display = 'none';
+        }
+
+        document.getElementById('route-info-box').style.display = 'block';
+
+        map.flyToBounds(activeLayer.getBounds(), { padding: [100, 100], duration: 1 });
+    }
+
+    function closeInfoBox() {
+        document.getElementById('route-info-box').style.display = 'none';
+        highlightLayer.clearLayers();
+        document.querySelectorAll('.route-item').forEach(el => el.classList.remove('active'));
+    }
+</script>
+</body>
+</html>
