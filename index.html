@@ -10,13 +10,11 @@
     <style>
         :root { 
             --accent: #ff0000; 
-            --dark-blue: #205ce8; 
+            --dot-color: #ff0000; /* Sjednocená barva pro obě tečky */
             --black: #000000;
             --white: #ffffff;
             --border: #e2e8f0; 
             --bg: #f8fafc; 
-            --gold: #f59e0b; 
-            --start-green: #205ce8; 
         }
 
         body { margin: 0; font-family: 'IBM Plex Sans', sans-serif; display: flex; height: 100vh; overflow: hidden; background: var(--bg); }
@@ -54,9 +52,23 @@
         
         #map { flex-grow: 1; z-index: 1; background: #cbd5e1; position: relative; }
         
-        .status-bar { padding: 10px 20px; font-size: 10px; color: #94a3b8; border-top: 1px solid var(--border); display: flex; gap: 10px; background: white; }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #cbd5e1; }
-        .dot-green { background: var(--start-green); }
+        /* PULZOVÁNÍ TRASY (ZMĚNA BARVY) */
+        .pulsing-route {
+            animation: routeColorPulse 1s infinite ease-in-out;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        @keyframes routeColorPulse {
+            0% { stroke: #0f172a; }   /* Původní tmavá modrá */
+            50% { stroke: #3b82f6; }  /* Světlejší modrá */
+            100% { stroke: #0f172a; } /* Zpět na tmavou */
+        }
+
+        /* DOTS (TEČKY) */
+        .glow-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); position: relative; background: var(--dot-color); }
+        .glow-dot::before { content: ''; position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px; border-radius: 50%; animation: pulse-glow 2s infinite; background: var(--dot-color); opacity: 0.4; }
+        @keyframes pulse-glow { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(3); opacity: 0; } }
 
         #route-info-box {
             position: absolute; top: 20px; right: 20px; width: 300px; background: white; z-index: 2000;
@@ -71,16 +83,11 @@
         .p-title { color: var(--black); font-weight: 700; font-size: 16px; line-height: 1.2; }
         .p-close { cursor: pointer; color: #94a3b8; font-size: 20px; line-height: 1; }
         .p-row { display: flex; align-items: center; margin-bottom: 10px; font-size: 13px; color: #334155; }
-        .p-icon { width: 28px; font-size: 16px; }
         .p-note { background: #f8fafc; border-radius: 8px; padding: 12px; font-size: 12px; color: #475569; margin-top: 12px; border-left: 4px solid var(--accent); line-height: 1.5; }
 
-        .glow-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); position: relative; }
-        .glow-dot::before { content: ''; position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px; border-radius: 50%; animation: pulse-glow 2s infinite; }
-        .dot-start { background: var(--start-green); }
-        .dot-start::before { background: var(--start-green); opacity: 0.4; }
-        .dot-end { background: var(--dark-blue); }
-        .dot-end::before { background: var(--dark-blue); opacity: 0.4; }
-        @keyframes pulse-glow { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(3); opacity: 0; } }
+        .status-bar { padding: 10px 20px; font-size: 10px; color: #94a3b8; border-top: 1px solid var(--border); display: flex; gap: 10px; background: white; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #cbd5e1; }
+        .dot-green { background: #22c55e; }
     </style>
 </head>
 <body>
@@ -195,18 +202,17 @@
         markersLayer.clearLayers();
         closeInfoBox();
 
-        // Pohled na celou Francii
         map.setView([46.6, 2.2], 6);
 
         if (franceBorders) {
             const shape = franceBorders.features.find(f => f.properties.code === val || f.properties.code === deptClean);
-            if (shape) L.geoJSON(shape, { style: { color: '#3381ff', weight: 3, fillColor: '#000', fillOpacity: 0.05 } }).addTo(borderLayer);
+            if (shape) L.geoJSON(shape, { style: { color: '#0f172a', weight: 3, fillColor: '#000', fillOpacity: 0.05 } }).addTo(borderLayer);
         }
 
         const route = allRoutes.find(r => String(r.dept) === val || String(r.dept) === deptClean);
         
         if (!route) {
-            container.innerHTML = '<div style="padding:20px; color:#3381ff; font-size:12px;">Sektor nenalezen.</div>';
+            container.innerHTML = '<div style="padding:20px; color:#94a3b8; font-size:12px;">Sektor nenalezen.</div>';
             return;
         }
 
@@ -217,12 +223,17 @@
             </div>`;
 
         const latlngs = decodePolyline(route.geom);
-        L.polyline(latlngs, { color: '#207ee8', weight: 5, opacity: 1, lineJoin: 'round' }).addTo(highlightLayer);
+        const poly = L.polyline(latlngs, { 
+            className: 'pulsing-route', // APLIKACE ANIMACE
+            color: '#0f172a', 
+            weight: 6, 
+            opacity: 1, 
+            lineJoin: 'round' 
+        }).addTo(highlightLayer);
         
-        const startIcon = L.divIcon({ className: 'glow-dot dot-start', iconSize: [12, 12] });
-        const endIcon = L.divIcon({ className: 'glow-dot dot-end', iconSize: [12, 12] });
-        L.marker(latlngs[0], { icon: startIcon }).addTo(markersLayer);
-        L.marker(latlngs[latlngs.length - 1], { icon: endIcon }).addTo(markersLayer);
+        const dotIcon = L.divIcon({ className: 'glow-dot', iconSize: [12, 12] });
+        L.marker(latlngs[0], { icon: dotIcon, interactive: false }).addTo(markersLayer);
+        L.marker(latlngs[latlngs.length - 1], { icon: dotIcon, interactive: false }).addTo(markersLayer);
 
         document.getElementById('info-title').innerText = route.name;
         document.getElementById('info-dist').innerText = route.distance;
@@ -242,7 +253,3 @@
 </script>
 </body>
 </html>
-
-
-
-
