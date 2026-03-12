@@ -256,7 +256,7 @@
             const deptShape = franceBorders.features.find(f => f.properties.code === deptInput || f.properties.code === deptClean);
             if (deptShape) {
                 L.geoJSON(deptShape, {
-                    style: { color: '#ff0000', weight: 4, fillColor: '#ffffff', fillOpacity: 0.2 }
+                    style: { color: '#2787F5', weight: 4, fillColor: '#ffffff', fillOpacity: 0.2 }
                 }).addTo(borderLayer);
             }
         }
@@ -293,7 +293,7 @@
         markersLayer.clearLayers();
         const box = document.getElementById('route-info-box');
         box.classList.remove('visible');
-        const activeLayer = L.geoJSON(r.geometry, { style: { color: '#ff0000', weight: 7, opacity: 1, lineJoin: 'round' } }).addTo(highlightLayer);
+        const activeLayer = L.geoJSON(r.geometry, { style: { color: '#2787F5', weight: 7, opacity: 1, lineJoin: 'round' } }).addTo(highlightLayer);
         const coords = r.geometry.coordinates;
         const startPoint = [coords[0][1], coords[0][0]];
         const endPoint = [coords[coords.length - 1][1], coords[coords.length - 1][0]];
@@ -326,4 +326,5 @@
 </script>
 </body>
 </html>
+
 
