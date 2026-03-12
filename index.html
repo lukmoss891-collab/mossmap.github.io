@@ -145,7 +145,13 @@
             const deptShape = franceBorders.features.find(f => f.properties.code === deptInput || f.properties.code === deptClean);
             if (deptShape) {
                 L.geoJSON(deptShape, {
-                    style: { color: '#1d4ed8', weight: 2, fillOpacity: 0.04, dashArray: '5, 5' }
+                    style: { 
+                        color: '#1d4ed8',   // Barva hranice
+                        weight: 4,          // Tloušťka čáry (zvýšeno pro "tlustou čáru")
+                        opacity: 0.8,       // Viditelnost čáry
+                        fillOpacity: 0.05,  // Velmi jemná výplň vnitřku
+                        fillColor: '#1d4ed8'
+                    }
                 }).addTo(borderLayer);
             }
         }
@@ -214,3 +220,4 @@
 </script>
 </body>
 </html>
+
