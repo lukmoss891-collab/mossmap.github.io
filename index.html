@@ -2,100 +2,158 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8" />
-    <title>MOSS ROUTES MASTER</title>
+    <title>MOSS ROUTES MANAGER</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        :root { --accent: #1d4ed8; --dark: #003399; --border: #e2e8f0; --bg: #f8fafc; --gold: #f59e0b; --start-green: #22c55e; }
+        :root { 
+            --accent: #ff0000; 
+            --dark: #0f172a; 
+            --black: #000000;
+            --white: #ffffff;
+            --border: #e2e8f0; 
+            --bg: #f8fafc; 
+            --gold: #f59e0b; 
+            --start-green: #22c55e; 
+        }
+
         body { margin: 0; font-family: 'IBM Plex Sans', sans-serif; display: flex; height: 100vh; overflow: hidden; background: var(--bg); }
         
-        /* ÚVODNÍ NAČÍTACÍ OBRAZOVKA */
+        /* JEMNĚ ŠEDÝ SPLASH SCREEN */
         #loader-wrapper {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle at center, #ffffff 0%, #f1f5f9 100%);
+            background-color: #f4f4f4; /* Jemně šedé pozadí */
+            /* Decentní světlý rastr */
+            background-image: repeating-linear-gradient(45deg, #eeeeee 0px, #eeeeee 2px, #f4f4f4 2px, #f4f4f4 10px);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 9999; transition: opacity 0.8s ease, visibility 0.8s;
+            z-index: 9999; 
+            transition: opacity 0.8s ease, visibility 0.8s ease;
+            opacity: 1;
+            visibility: visible;
         }
-        .loader-content { text-align: center; font-family: 'IBM Plex Mono', monospace; color: var(--dark); }
-        .loader-icon { font-size: 32px; margin-bottom: 15px; animation: bounce 2s infinite ease-in-out; }
-        .loader-text { font-size: 14px; letter-spacing: 1px; font-weight: 600; }
-        .dots::after { content: ''; animation: dots 1.5s infinite; }
 
-        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-        @keyframes dots { 0% { content: ''; } 33% { content: '.'; } 66% { content: '..'; } 100% { content: '...'; } }
+        #loader-wrapper.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
 
-        /* PULZUJÍCÍ BODY (GLOW DOTS) */
-        .glow-dot {
-            width: 12px; height: 12px;
-            border-radius: 50%;
-            border: 2px solid white;
-            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+        .loader-content { 
+            width: max-content; 
             position: relative;
-        }
-        .glow-dot::before {
-            content: '';
-            position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px;
-            border-radius: 50%;
-            animation: pulse-glow 2s infinite;
-        }
-        .dot-start { background: var(--start-green); }
-        .dot-start::before { background: var(--start-green); opacity: 0.4; }
-        .dot-end { background: var(--accent); }
-        .dot-end::before { background: var(--accent); opacity: 0.4; }
-
-        @keyframes pulse-glow {
-            0% { transform: scale(1); opacity: 0.6; }
-            100% { transform: scale(3); opacity: 0; }
+            padding: 40px;
+            text-align: left;
         }
 
+        .loader-title {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 22px; /* Zvětšeno o ~20% */
+            font-weight: 600;
+            color: var(--black);
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            white-space: nowrap;
+        }
+
+        .rect-container { width: 100%; }
+        
+        .rect {
+            background: var(--accent);
+            height: 29px; /* Zvětšeno o ~20% (z 24px) */
+            width: 0;
+            margin-bottom: 8px;
+            animation: drawRect 1.2s cubic-bezier(0.7, 0, 0.3, 1) forwards;
+        }
+
+        .rect-thin {
+            height: 15px; /* Zvětšeno o ~20% (z 12px) */
+            animation-delay: 0.2s;
+        }
+
+        @keyframes drawRect {
+            from { width: 0; }
+            to { width: 100%; }
+        }
+
+        .loader-status {
+            margin-top: 30px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 15.5px; /* Zvětšeno o ~20% (z 13px) */
+            color: var(--black);
+            font-weight: 400;
+            letter-spacing: 0.5px;
+            opacity: 0;
+            animation: fadeInStatus 0.5s ease forwards 0.8s;
+        }
+
+        .loader-status div { margin-bottom: 8px; }
+
+        @keyframes fadeInStatus {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ZBYTEK ROZHRANÍ */
         #panel { width: 420px; border-right: 1px solid var(--border); background: white; display: flex; flex-direction: column; z-index: 1000; box-shadow: 4px 0 15px rgba(0,0,0,0.05); }
-        .tab-nav { background: var(--accent); padding: 15px; color: white; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 1px; }
+        .tab-nav { background: var(--black); padding: 15px; color: white; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 2px; border-bottom: 3px solid var(--accent); }
         .section { padding: 20px; border-bottom: 1px solid var(--border); }
         h1 { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 15px 0; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; }
         h1::before { content: ''; width: 3px; height: 12px; background: var(--accent); border-radius: 2px; }
         
-        .btn { width: 100%; padding: 12px; cursor: pointer; border-radius: 8px; border: none; font-weight: 600; font-size: 13px; transition: 0.2s; background: var(--accent); color: white; }
-        .btn:hover { filter: brightness(1.1); }
+        .btn { width: 100%; padding: 12px; cursor: pointer; border-radius: 8px; border: none; font-weight: 600; font-size: 13px; transition: 0.2s; background: var(--black); color: white; }
+        .btn:hover { background: var(--accent); }
         
         .route-item { padding: 15px 20px; border-bottom: 1px solid var(--border); cursor: pointer; transition: 0.2s; border-left: 4px solid transparent; }
         .route-item:hover { background: #f8fafc; }
-        .route-item.active { background: #eff6ff; border-left: 4px solid var(--accent); }
+        .route-item.active { background: #fff1f2; border-left: 4px solid var(--accent); }
         .badge-pref { color: var(--gold); font-weight: bold; margin-right: 4px; }
         
         #map { flex-grow: 1; z-index: 1; background: #cbd5e1; position: relative; }
         
-        .status-bar { padding: 10px 20px; font-size: 10px; color: #94a3b8; border-top: 1px solid var(--border); display: flex; gap: 10px; }
+        .status-bar { padding: 10px 20px; font-size: 10px; color: #94a3b8; border-top: 1px solid var(--border); display: flex; gap: 10px; background: white; }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #cbd5e1; }
-        .dot-green { background: #22c55e; }
+        .dot-green { background: var(--start-green); }
 
         #route-info-box {
             position: absolute; top: 20px; right: 20px; width: 300px; background: white; z-index: 2000;
             border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); border: 1px solid var(--border);
-            overflow: hidden;
-            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
-            transform: translateX(20px);
-            opacity: 0;
-            pointer-events: none;
+            overflow: hidden; transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+            transform: translateX(20px); opacity: 0; pointer-events: none;
         }
         #route-info-box.visible { transform: translateX(0); opacity: 1; pointer-events: auto; }
 
         .p-container { padding: 20px; }
         .p-header { border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-start; }
-        .p-title { color: var(--dark); font-weight: 700; font-size: 16px; line-height: 1.2; }
+        .p-title { color: var(--black); font-weight: 700; font-size: 16px; line-height: 1.2; }
         .p-close { cursor: pointer; color: #94a3b8; font-size: 20px; line-height: 1; }
         .p-row { display: flex; align-items: center; margin-bottom: 10px; font-size: 13px; color: #334155; }
         .p-icon { width: 28px; font-size: 16px; }
-        .p-note { background: #f8fafc; border-radius: 8px; padding: 12px; font-size: 12px; color: #475569; margin-top: 12px; border-left: 4px solid #cbd5e1; line-height: 1.5; }
+        .p-note { background: #f8fafc; border-radius: 8px; padding: 12px; font-size: 12px; color: #475569; margin-top: 12px; border-left: 4px solid var(--accent); line-height: 1.5; }
+
+        .glow-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); position: relative; }
+        .glow-dot::before { content: ''; position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px; border-radius: 50%; animation: pulse-glow 2s infinite; }
+        .dot-start { background: var(--start-green); }
+        .dot-start::before { background: var(--start-green); opacity: 0.4; }
+        .dot-end { background: var(--accent); }
+        .dot-end::before { background: var(--accent); opacity: 0.4; }
+        @keyframes pulse-glow { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(3); opacity: 0; } }
     </style>
 </head>
 <body>
 
 <div id="loader-wrapper">
     <div class="loader-content">
-        <div class="loader-icon">🚚🗺️</div>
-        <div class="loader-text">Načítám trasy, načítám mapové podklady<span class="dots"></span></div>
+        <div class="loader-title">MOSS ROUTES MANAGER</div>
+        <div class="rect-container">
+            <div class="rect"></div>
+            <div class="rect rect-thin"></div>
+        </div>
+        <div class="loader-status">
+            <div>- načítám mapové podklady...</div>
+            <div>- načítám trasy...</div>
+        </div>
     </div>
 </div>
 
@@ -105,18 +163,18 @@
     <div class="section">
         <h1>Vyhledávání</h1>
         <div style="display:flex; gap: 5px;">
-            <input type="text" id="viewerDept" placeholder="Zadej Dept (např. 85)" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:8px;">
+            <input type="text" id="viewerDept" placeholder="Zadej Dept (např. 85)" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:8px; font-family: 'IBM Plex Mono';">
             <button class="btn" style="width:auto; margin:0; padding:0 15px;" onclick="filterByDept()">ZOBRAZIT</button>
         </div>
     </div>
 
     <div id="route-list" style="flex-grow:1; overflow-y:auto;">
-        <div style="padding:20px; color:#94a3b8; font-size:12px; text-align:center;">Načítání dat...</div>
+        <div style="padding:20px; color:#94a3b8; font-size:12px; text-align:center;">Systém připraven k vyhledávání.</div>
     </div>
 
     <div class="status-bar">
-        <span><span id="dot-db" class="status-dot"></span> DB tras</span>
-        <span><span id="dot-geo" class="status-dot"></span> Hranice</span>
+        <span><span id="dot-db" class="status-dot"></span> DATABASE</span>
+        <span><span id="dot-geo" class="status-dot"></span> GEODATA</span>
     </div>
 </div>
 
@@ -157,18 +215,16 @@
     async function initData() {
         setTimeout(() => {
             const loader = document.getElementById('loader-wrapper');
-            loader.style.opacity = '0';
-            loader.style.visibility = 'hidden';
-        }, 2000);
+            if(loader) loader.classList.add('hidden');
+        }, 3000);
 
         try {
-            const response = await fetch('routes.json');
+            const response = await fetch('database.json');
             if (!response.ok) throw new Error();
             allRoutes = await response.json();
             document.getElementById('dot-db').classList.add('dot-green');
-            document.getElementById('route-list').innerHTML = '<div style="padding:20px; color:#94a3b8; font-size:12px; text-align:center;">Zadejte číslo departmentu výše.</div>';
         } catch (err) {
-            document.getElementById('route-list').innerHTML = '<div style="padding:20px; color:#ef4444; font-size:12px;">Chyba: database.json nenalezen.</div>';
+            document.getElementById('route-list').innerHTML = '<div style="padding:20px; color:#ef4444; font-size:12px;">DATABASE NOT FOUND.</div>';
         }
 
         try {
@@ -178,7 +234,7 @@
                 document.getElementById('dot-geo').classList.add('dot-green');
             }
         } catch (err) {
-            console.log("Hranice france.json nejsou k dispozici.");
+            console.log("France geodata missing.");
         }
     }
 
@@ -187,38 +243,30 @@
     function filterByDept() {
         const deptInput = document.getElementById('viewerDept').value.trim();
         if (!deptInput) return;
-        
         const deptClean = deptInput.padStart(2, '0');
         const container = document.getElementById('route-list');
-        
         container.innerHTML = '';
         routeLayers.clearLayers();
         highlightLayer.clearLayers();
         borderLayer.clearLayers();
         markersLayer.clearLayers();
         closeInfoBox();
-
         map.flyTo([46.6, 2.2], 6, { duration: 1.5 });
-
         if (franceBorders) {
             const deptShape = franceBorders.features.find(f => f.properties.code === deptInput || f.properties.code === deptClean);
             if (deptShape) {
                 L.geoJSON(deptShape, {
-                    style: { color: '#1d4ed8', weight: 4, fillColor: '#ffffff', fillOpacity: 0.3 }
+                    style: { color: '#ff0000', weight: 4, fillColor: '#ffffff', fillOpacity: 0.2 }
                 }).addTo(borderLayer);
             }
         }
-
         const filtered = allRoutes.filter(r => r.dept === deptInput || r.dept === deptClean);
-        
         if (filtered.length === 0) {
-            container.innerHTML = '<div style="padding:20px; color:#94a3b8; font-size:12px;">V tomto departmentu nejsou žádné trasy.</div>';
+            container.innerHTML = '<div style="padding:20px; color:#94a3b8; font-size:12px;">Žádné trasy v tomto sektoru.</div>';
             return;
         }
-
         let preferredRoute = null;
         let preferredElement = null;
-
         filtered.forEach(r => {
             const div = document.createElement('div');
             div.className = 'route-item';
@@ -226,23 +274,12 @@
             div.innerHTML = `<strong>${prefBadge}${r.name}</strong><br><small>${r.distance} km</small>`;
             div.onclick = () => activateRoute(r, div);
             container.appendChild(div);
-
-            L.geoJSON(r.geometry, { style: { color: '#000', weight: 7, opacity: 0.15 } }).addTo(routeLayers);
-            const ghost = L.geoJSON(r.geometry, { 
-                style: { color: '#fff', weight: 5, opacity: 1, cursor: 'pointer' } 
-            }).addTo(routeLayers);
-
+            L.geoJSON(r.geometry, { style: { color: '#000', weight: 7, opacity: 0.1 } }).addTo(routeLayers);
+            const ghost = L.geoJSON(r.geometry, { style: { color: '#fff', weight: 4, opacity: 0.5, cursor: 'pointer' } }).addTo(routeLayers);
             ghost.on('click', () => activateRoute(r, div));
-
-            if (r.preferred) {
-                preferredRoute = r;
-                preferredElement = div;
-            }
+            if (r.preferred) { preferredRoute = r; preferredElement = div; }
         });
-
-        if (preferredRoute) {
-            activateRoute(preferredRoute, preferredElement);
-        }
+        if (preferredRoute) { activateRoute(preferredRoute, preferredElement); }
     }
 
     function activateRoute(r, element) {
@@ -256,30 +293,19 @@
         markersLayer.clearLayers();
         const box = document.getElementById('route-info-box');
         box.classList.remove('visible');
-
-        const activeLayer = L.geoJSON(r.geometry, { 
-            style: { color: '#1d4ed8', weight: 8, opacity: 1, lineJoin: 'round' } 
-        }).addTo(highlightLayer);
-
-        // VYTĚŽENÍ BODŮ PRO IKONKY
+        const activeLayer = L.geoJSON(r.geometry, { style: { color: '#ff0000', weight: 7, opacity: 1, lineJoin: 'round' } }).addTo(highlightLayer);
         const coords = r.geometry.coordinates;
-        // OSRM dává souřadnice v LineStringu jako [lng, lat]
         const startPoint = [coords[0][1], coords[0][0]];
         const endPoint = [coords[coords.length - 1][1], coords[coords.length - 1][0]];
-
-        // PŘIDÁNÍ PULZUJÍCÍCH BODŮ
         const startIcon = L.divIcon({ className: 'glow-dot dot-start', iconSize: [12, 12] });
         const endIcon = L.divIcon({ className: 'glow-dot dot-end', iconSize: [12, 12] });
-
         L.marker(startPoint, { icon: startIcon, interactive: false }).addTo(markersLayer);
         L.marker(endPoint, { icon: endIcon, interactive: false }).addTo(markersLayer);
-
         setTimeout(() => {
             document.getElementById('info-title').innerText = r.name;
             document.getElementById('info-dist').innerText = r.distance;
             const p = parseFloat(r.price);
             document.getElementById('info-price').innerText = (p && p > 0) ? p : '---';
-            
             if (r.note) {
                 document.getElementById('info-note').innerText = r.note;
                 document.getElementById('info-note-container').style.display = 'block';
@@ -288,7 +314,6 @@
             }
             box.classList.add('visible');
         }, 50);
-
         map.flyToBounds(activeLayer.getBounds(), { padding: [100, 100], duration: 1 });
     }
 
@@ -301,5 +326,3 @@
 </script>
 </body>
 </html>
-
-
