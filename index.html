@@ -210,7 +210,7 @@
     let borderLayer = L.layerGroup().addTo(map);
     let markersLayer = L.layerGroup().addTo(map);
 
-    // --- POMOCNÁ FUNKCE PRO DEKÓDOVÁNÍ NOVÉHO FORMÁTU ---
+    // DEKODÉR: Převede řetězec z nového JSONu na pole souřadnic
     function decodePolyline(str) {
         let index = 0, lat = 0, lng = 0, coords = [], shift, result, byte;
         while (index < str.length) {
@@ -220,16 +220,26 @@
             shift = 0; result = 0;
             do { byte = str.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
             lng += ((result & 1) ? ~(result >> 1) : (result >> 1));
+            // OSRM/Editor ukládá [lng, lat], vracíme tedy stejně pro GeoJSON standard
             coords.push([lng / 1e5, lat / 1e5]);
         }
         return coords;
     }
 
-    // Pomocná funkce pro sjednocení geometrie (podporuje starý i nový formát)
+    // SJEDNOCENÍ: Tato funkce připraví data pro Leaflet bez ohledu na formát
     function getGeoJSON(r) {
+        if (!r.geometry) return null;
+        // Pokud je geometrie řetězec (nový formát), vytvoříme z něj GeoJSON objekt
         if (typeof r.geometry === 'string') {
-            return { type: "LineString", coordinates: decodePolyline(r.geometry) };
+            return {
+                type: "Feature",
+                geometry: {
+                    type: "LineString",
+                    coordinates: decodePolyline(r.geometry)
+                }
+            };
         }
+        // Pokud je to starý formát (už objekt), vrátíme ho přímo
         return r.geometry;
     }
 
@@ -240,7 +250,7 @@
         }, 3000);
 
         try {
-            const response = await fetch('routes.json');
+            const response = await fetch('database.json');
             if (!response.ok) throw new Error();
             allRoutes = await response.json();
             document.getElementById('dot-db').classList.add('dot-green');
@@ -283,7 +293,7 @@
             }
         }
 
-        const filtered = allRoutes.filter(r => r.dept === deptInput || r.dept === deptClean);
+        const filtered = allRoutes.filter(r => String(r.dept) === String(deptInput) || String(r.dept) === String(deptClean));
         if (filtered.length === 0) {
             container.innerHTML = '<div style="padding:20px; color:#94a3b8; font-size:12px;">Žádné trasy v tomto sektoru.</div>';
             return;
@@ -293,8 +303,9 @@
         let preferredElement = null;
 
         filtered.forEach(r => {
-            const geoData = getGeoJSON(r); // Sjednocení formátu
-            
+            const geoData = getGeoJSON(r);
+            if (!geoData) return;
+
             const div = document.createElement('div');
             div.className = 'route-item';
             const prefBadge = r.preferred ? '<span class="badge-pref">★</span> ' : '';
@@ -302,8 +313,12 @@
             div.onclick = () => activateRoute(r, div);
             container.appendChild(div);
             
+            // Vykreslení "ghost" (neaktivních) tras
             L.geoJSON(geoData, { style: { color: '#000', weight: 7, opacity: 0.1 } }).addTo(routeLayers);
-            const ghost = L.geoJSON(geoData, { style: { color: '#ffffff', weight: 4, opacity: 0.7, cursor: 'pointer' } }).addTo(routeLayers);
+            const ghost = L.geoJSON(geoData, { 
+                style: { color: '#ffffff', weight: 4, opacity: 0.7, cursor: 'pointer' } 
+            }).addTo(routeLayers);
+            
             ghost.on('click', () => activateRoute(r, div));
             
             if (r.preferred) { preferredRoute = r; preferredElement = div; }
@@ -323,18 +338,25 @@
         const box = document.getElementById('route-info-box');
         box.classList.remove('visible');
         
-        const geoData = getGeoJSON(r); // Sjednocení formátu
+        const geoData = getGeoJSON(r);
+        if (!geoData) return;
         
-        const activeLayer = L.geoJSON(geoData, { style: { color: '#0f172a', weight: 7, opacity: 1, lineJoin: 'round' } }).addTo(highlightLayer);
+        const activeLayer = L.geoJSON(geoData, { 
+            style: { color: '#0f172a', weight: 7, opacity: 1, lineJoin: 'round' } 
+        }).addTo(highlightLayer);
         
-        const coords = geoData.coordinates;
-        const startPoint = [coords[0][1], coords[0][0]];
-        const endPoint = [coords[coords.length - 1][1], coords[coords.length - 1][0]];
-        
-        const startIcon = L.divIcon({ className: 'glow-dot dot-start', iconSize: [12, 12] });
-        const endIcon = L.divIcon({ className: 'glow-dot dot-end', iconSize: [12, 12] });
-        L.marker(startPoint, { icon: startIcon, interactive: false }).addTo(markersLayer);
-        L.marker(endPoint, { icon: endIcon, interactive: false }).addTo(markersLayer);
+        // Získání souřadnic pro startovní a cílový bod
+        const coords = (geoData.geometry) ? geoData.geometry.coordinates : geoData.coordinates;
+        if (coords && coords.length > 0) {
+            const startPoint = [coords[0][1], coords[0][0]];
+            const endPoint = [coords[coords.length - 1][1], coords[coords.length - 1][0]];
+            
+            const startIcon = L.divIcon({ className: 'glow-dot dot-start', iconSize: [12, 12] });
+            const endIcon = L.divIcon({ className: 'glow-dot dot-end', iconSize: [12, 12] });
+            
+            L.marker(startPoint, { icon: startIcon, interactive: false }).addTo(markersLayer);
+            L.marker(endPoint, { icon: endIcon, interactive: false }).addTo(markersLayer);
+        }
         
         setTimeout(() => {
             document.getElementById('info-title').innerText = r.name;
@@ -349,6 +371,7 @@
             }
             box.classList.add('visible');
         }, 50);
+        
         map.flyToBounds(activeLayer.getBounds(), { padding: [100, 100], duration: 1 });
     }
 
@@ -361,4 +384,5 @@
 </script>
 </body>
 </html>
+
 
