@@ -153,7 +153,6 @@
     let borderLayer = L.layerGroup().addTo(map);
     let markersLayer = L.layerGroup().addTo(map);
 
-    // DEKODÉR: Převede řetězec z klíče "geom" na pole [lat, lng]
     function decodePolyline(str) {
         let index = 0, lat = 0, lng = 0, coords = [], shift, result, byte;
         while (index < str.length) {
@@ -171,7 +170,7 @@
     async function initData() {
         setTimeout(() => document.getElementById('loader-wrapper').classList.add('hidden'), 2500);
         try {
-            const r = await fetch('routes.json');
+            const r = await fetch('database.json');
             allRoutes = await r.json();
             document.getElementById('dot-db').classList.add('dot-green');
         } catch (e) { console.error("DB error"); }
@@ -191,44 +190,40 @@
         const deptClean = val.padStart(2, '0');
         const container = document.getElementById('route-list');
         
-        // Reset mapy
         highlightLayer.clearLayers();
         borderLayer.clearLayers();
         markersLayer.clearLayers();
         closeInfoBox();
 
-        // Hranice sektoru
+        // Pohled na celou Francii
+        map.setView([46.6, 2.2], 6);
+
         if (franceBorders) {
             const shape = franceBorders.features.find(f => f.properties.code === val || f.properties.code === deptClean);
-            if (shape) L.geoJSON(shape, { style: { color: '#0f172a', weight: 3, fillColor: '#000', fillOpacity: 0.05 } }).addTo(borderLayer);
+            if (shape) L.geoJSON(shape, { style: { color: '#3381ff', weight: 3, fillColor: '#000', fillOpacity: 0.05 } }).addTo(borderLayer);
         }
 
-        // Najít trasu
         const route = allRoutes.find(r => String(r.dept) === val || String(r.dept) === deptClean);
         
         if (!route) {
-            container.innerHTML = '<div style="padding:20px; color:#94a3b8; font-size:12px;">Sektor nenalezen.</div>';
+            container.innerHTML = '<div style="padding:20px; color:#3381ff; font-size:12px;">Sektor nenalezen.</div>';
             return;
         }
 
-        // UI seznamu
         container.innerHTML = `
             <div class="route-item active">
                 <strong>${route.name}</strong><br>
                 <small>Sektor: ${route.dept} | ${route.distance} km</small>
             </div>`;
 
-        // OKAMŽITÉ VYKRESLENÍ
         const latlngs = decodePolyline(route.geom);
-        const poly = L.polyline(latlngs, { color: '#0f172a', weight: 6, opacity: 1, lineJoin: 'round' }).addTo(highlightLayer);
+        L.polyline(latlngs, { color: '#0f172a', weight: 6, opacity: 1, lineJoin: 'round' }).addTo(highlightLayer);
         
-        // Markery
         const startIcon = L.divIcon({ className: 'glow-dot dot-start', iconSize: [12, 12] });
         const endIcon = L.divIcon({ className: 'glow-dot dot-end', iconSize: [12, 12] });
         L.marker(latlngs[0], { icon: startIcon }).addTo(markersLayer);
         L.marker(latlngs[latlngs.length - 1], { icon: endIcon }).addTo(markersLayer);
 
-        // Info box
         document.getElementById('info-title').innerText = route.name;
         document.getElementById('info-dist').innerText = route.distance;
         document.getElementById('info-price').innerText = route.price || '---';
@@ -239,8 +234,6 @@
             document.getElementById('info-note-container').style.display = 'none';
         }
         document.getElementById('route-info-box').classList.add('visible');
-
-        map.flyToBounds(poly.getBounds(), { padding: [80, 80], duration: 1.2 });
     }
 
     function closeInfoBox() {
