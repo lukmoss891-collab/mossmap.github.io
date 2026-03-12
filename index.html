@@ -217,7 +217,7 @@
             </div>`;
 
         const latlngs = decodePolyline(route.geom);
-        L.polyline(latlngs, { color: '#0f172a', weight: 6, opacity: 1, lineJoin: 'round' }).addTo(highlightLayer);
+        L.polyline(latlngs, { color: '#207ee8', weight: 5, opacity: 1, lineJoin: 'round' }).addTo(highlightLayer);
         
         const startIcon = L.divIcon({ className: 'glow-dot dot-start', iconSize: [12, 12] });
         const endIcon = L.divIcon({ className: 'glow-dot dot-end', iconSize: [12, 12] });
@@ -242,5 +242,6 @@
 </script>
 </body>
 </html>
+
 
 
