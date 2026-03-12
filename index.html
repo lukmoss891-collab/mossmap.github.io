@@ -31,17 +31,30 @@
         .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #cbd5e1; }
         .dot-green { background: #22c55e; }
 
-        #route-info-box {
-            position: absolute; top: 20px; right: 20px; width: 300px; background: white; z-index: 2000;
-            border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); display: none; overflow: hidden; border: 1px solid var(--border);
-        }
-        .p-container { padding: 20px; }
-        .p-header { border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-start; }
-        .p-title { color: var(--dark); font-weight: 700; font-size: 16px; line-height: 1.2; }
-        .p-close { cursor: pointer; color: #94a3b8; font-size: 20px; line-height: 1; }
-        .p-row { display: flex; align-items: center; margin-bottom: 10px; font-size: 13px; color: #334155; }
-        .p-icon { width: 28px; font-size: 16px; }
-        .p-note { background: #f8fafc; border-radius: 8px; padding: 12px; font-size: 12px; color: #475569; margin-top: 12px; border-left: 4px solid #cbd5e1; line-height: 1.5; }
+       #route-info-box {
+    position: absolute; 
+    top: 20px; 
+    right: 20px; 
+    width: 300px; 
+    background: white; 
+    z-index: 2000;
+    border-radius: 12px; 
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
+    border: 1px solid var(--border);
+    overflow: hidden;
+    
+    /* Animace */
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+    transform: translateX(20px); /* Výchozí pozice mírně vpravo */
+    opacity: 0;
+    pointer-events: none; /* Dokud není aktivní, nebrání klikání v mapě */
+}
+
+#route-info-box.visible {
+    transform: translateX(0); /* Přijede na své místo */
+    opacity: 1;
+    pointer-events: auto;
+}
     </style>
 </head>
 <body>
@@ -226,4 +239,5 @@
 </script>
 </body>
 </html>
+
 
