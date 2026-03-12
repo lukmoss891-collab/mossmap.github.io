@@ -8,7 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        :root { --accent: #1d4ed8; --dark: #003399; --border: #e2e8f0; --bg: #f8fafc; }
+        :root { --accent: #1d4ed8; --dark: #003399; --border: #e2e8f0; --bg: #f8fafc; --gold: #f59e0b; }
         body { margin: 0; font-family: 'IBM Plex Sans', sans-serif; display: flex; height: 100vh; overflow: hidden; background: var(--bg); }
         
         #panel { width: 420px; border-right: 1px solid var(--border); background: white; display: flex; flex-direction: column; z-index: 1000; box-shadow: 4px 0 15px rgba(0,0,0,0.05); }
@@ -23,10 +23,10 @@
         .route-item { padding: 15px 20px; border-bottom: 1px solid var(--border); cursor: pointer; transition: 0.2s; border-left: 4px solid transparent; }
         .route-item:hover { background: #f8fafc; }
         .route-item.active { background: #eff6ff; border-left: 4px solid var(--accent); }
+        .badge-pref { color: var(--gold); font-weight: bold; margin-right: 4px; }
         
         #map { flex-grow: 1; z-index: 1; background: #cbd5e1; position: relative; }
         
-        /* Stavové kontrolky dole v panelu */
         .status-bar { padding: 10px 20px; font-size: 10px; color: #94a3b8; border-top: 1px solid var(--border); display: flex; gap: 10px; }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #cbd5e1; }
         .dot-green { background: #22c55e; }
@@ -100,9 +100,7 @@
     let highlightLayer = L.layerGroup().addTo(map);
     let borderLayer = L.layerGroup().addTo(map);
 
-    // AUTOMATICKÉ NAČÍTÁNÍ PŘI STARTU STRÁNKY
     async function initData() {
-        // 1. Načtení databáze tras
         try {
             const response = await fetch('database.json');
             if (!response.ok) throw new Error();
@@ -113,7 +111,6 @@
             document.getElementById('route-list').innerHTML = '<div style="padding:20px; color:#ef4444; font-size:12px;">Chyba: database.json nenalezen.</div>';
         }
 
-        // 2. Načtení hranic
         try {
             const response = await fetch('france.json');
             if (response.ok) {
@@ -125,7 +122,6 @@
         }
     }
 
-    // Spuštění inicializace
     initData();
 
     function filterByDept() {
@@ -145,13 +141,7 @@
             const deptShape = franceBorders.features.find(f => f.properties.code === deptInput || f.properties.code === deptClean);
             if (deptShape) {
                 L.geoJSON(deptShape, {
-                    style: { 
-                        color: '#1d4ed8',   // Barva hranice
-                        weight: 4,          // Tloušťka čáry (zvýšeno pro "tlustou čáru")
-                        opacity: 0.8,       // Viditelnost čáry
-                        fillOpacity: 0.05,  // Velmi jemná výplň vnitřku
-                        fillColor: '#1d4ed8'
-                    }
+                    style: { color: '#1d4ed8', weight: 2, fillOpacity: 0.04, dashArray: '5, 5' }
                 }).addTo(borderLayer);
             }
         }
@@ -164,14 +154,19 @@
         }
 
         const groupBounds = L.latLngBounds();
+        let preferredRoute = null;
+        let preferredElement = null;
 
         filtered.forEach(r => {
             const div = document.createElement('div');
             div.className = 'route-item';
-            div.innerHTML = `<strong>${r.name}</strong><br><small>${r.distance} km</small>`;
+            // Pokud je trasa preferred, přidáme hvězdičku
+            const prefBadge = r.preferred ? '<span class="badge-pref">★</span> ' : '';
+            div.innerHTML = `<strong>${prefBadge}${r.name}</strong><br><small>${r.distance} km</small>`;
             div.onclick = () => activateRoute(r, div);
             container.appendChild(div);
 
+            // Základní vykreslení tras (bílá s okrajem)
             L.geoJSON(r.geometry, { style: { color: '#000', weight: 7, opacity: 0.15 } }).addTo(routeLayers);
             const ghost = L.geoJSON(r.geometry, { 
                 style: { color: '#fff', weight: 5, opacity: 1, cursor: 'pointer' } 
@@ -179,14 +174,25 @@
 
             groupBounds.extend(ghost.getBounds());
             ghost.on('click', () => activateRoute(r, div));
+
+            // Uložíme si referenci na preferred trasu pro automatický start
+            if (r.preferred) {
+                preferredRoute = r;
+                preferredElement = div;
+            }
         });
 
-        map.flyToBounds(groupBounds, { padding: [50, 50], duration: 1.5 });
+        // Logika automatického zobrazení preferred trasy
+        if (preferredRoute) {
+            activateRoute(preferredRoute, preferredElement);
+        } else {
+            map.flyToBounds(groupBounds, { padding: [50, 50], duration: 1.5 });
+        }
     }
 
     function activateRoute(r, element) {
         document.querySelectorAll('.route-item').forEach(el => el.classList.remove('active'));
-        element.classList.add('active');
+        if (element) element.classList.add('active');
         showRouteOnMap(r);
     }
 
@@ -220,4 +226,3 @@
 </script>
 </body>
 </html>
-
