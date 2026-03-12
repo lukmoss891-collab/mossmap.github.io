@@ -11,6 +11,20 @@
         :root { --accent: #1d4ed8; --dark: #003399; --border: #e2e8f0; --bg: #f8fafc; --gold: #f59e0b; }
         body { margin: 0; font-family: 'IBM Plex Sans', sans-serif; display: flex; height: 100vh; overflow: hidden; background: var(--bg); }
         
+        #loader-wrapper {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #ffffff 0%, #f1f5f9 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 9999; transition: opacity 0.8s ease, visibility 0.8s;
+        }
+        .loader-content { text-align: center; font-family: 'IBM Plex Mono', monospace; color: var(--dark); }
+        .loader-icon { font-size: 32px; margin-bottom: 15px; animation: bounce 2s infinite ease-in-out; }
+        .loader-text { font-size: 14px; letter-spacing: 1px; font-weight: 600; }
+        .dots::after { content: ''; animation: dots 1.5s infinite; }
+
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes dots { 0% { content: ''; } 33% { content: '.'; } 66% { content: '..'; } 100% { content: '...'; } }
+
         #panel { width: 420px; border-right: 1px solid var(--border); background: white; display: flex; flex-direction: column; z-index: 1000; box-shadow: 4px 0 15px rgba(0,0,0,0.05); }
         .tab-nav { background: var(--accent); padding: 15px; color: white; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 1px; }
         .section { padding: 20px; border-bottom: 1px solid var(--border); }
@@ -40,11 +54,7 @@
             opacity: 0;
             pointer-events: none;
         }
-        #route-info-box.visible {
-            transform: translateX(0);
-            opacity: 1;
-            pointer-events: auto;
-        }
+        #route-info-box.visible { transform: translateX(0); opacity: 1; pointer-events: auto; }
 
         .p-container { padding: 20px; }
         .p-header { border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-start; }
@@ -56,6 +66,13 @@
     </style>
 </head>
 <body>
+
+<div id="loader-wrapper">
+    <div class="loader-content">
+        <div class="loader-icon">🚚🗺️</div>
+        <div class="loader-text">Načítám trasy, načítám mapové podklady<span class="dots"></span></div>
+    </div>
+</div>
 
 <div id="panel">
     <div class="tab-nav">ROUTE MASTER - ONLINE</div>
@@ -112,8 +129,14 @@
     let borderLayer = L.layerGroup().addTo(map);
 
     async function initData() {
+        setTimeout(() => {
+            const loader = document.getElementById('loader-wrapper');
+            loader.style.opacity = '0';
+            loader.style.visibility = 'hidden';
+        }, 2000);
+
         try {
-            const response = await fetch('routes.json');
+            const response = await fetch('database.json');
             if (!response.ok) throw new Error();
             allRoutes = await response.json();
             document.getElementById('dot-db').classList.add('dot-green');
@@ -148,16 +171,13 @@
         borderLayer.clearLayers();
         closeInfoBox();
 
+        map.flyTo([46.6, 2.2], 6, { duration: 1.5 });
+
         if (franceBorders) {
             const deptShape = franceBorders.features.find(f => f.properties.code === deptInput || f.properties.code === deptClean);
             if (deptShape) {
                 L.geoJSON(deptShape, {
-                    style: { 
-                        color: '#1d4ed8', 
-                        weight: 4, 
-                        fillColor: '#ffffff',
-                        fillOpacity: 0.3 
-                    }
+                    style: { color: '#1d4ed8', weight: 4, fillColor: '#ffffff', fillOpacity: 0.3 }
                 }).addTo(borderLayer);
             }
         }
@@ -169,7 +189,6 @@
             return;
         }
 
-        const groupBounds = L.latLngBounds();
         let preferredRoute = null;
         let preferredElement = null;
 
@@ -186,7 +205,6 @@
                 style: { color: '#fff', weight: 5, opacity: 1, cursor: 'pointer' } 
             }).addTo(routeLayers);
 
-            groupBounds.extend(ghost.getBounds());
             ghost.on('click', () => activateRoute(r, div));
 
             if (r.preferred) {
@@ -197,8 +215,6 @@
 
         if (preferredRoute) {
             activateRoute(preferredRoute, preferredElement);
-        } else {
-            map.flyToBounds(groupBounds, { padding: [50, 50], duration: 1.5 });
         }
     }
 
@@ -211,7 +227,6 @@
     function showRouteOnMap(r) {
         highlightLayer.clearLayers();
         const box = document.getElementById('route-info-box');
-        
         box.classList.remove('visible');
 
         const activeLayer = L.geoJSON(r.geometry, { 
@@ -221,7 +236,10 @@
         setTimeout(() => {
             document.getElementById('info-title').innerText = r.name;
             document.getElementById('info-dist').innerText = r.distance;
-            document.getElementById('info-price').innerText = r.price || '---';
+            
+            // Kontrola ceny: pokud je nula nebo neexistuje, dáme pomlčky
+            const priceVal = r.price ? parseFloat(r.price) : 0;
+            document.getElementById('info-price').innerText = priceVal > 0 ? priceVal : '---';
             
             if (r.note) {
                 document.getElementById('info-note').innerText = r.note;
@@ -243,4 +261,3 @@
 </script>
 </body>
 </html>
-
