@@ -19,28 +19,21 @@
         
         .btn { width: 100%; padding: 12px; cursor: pointer; border-radius: 8px; border: none; font-weight: 600; font-size: 13px; transition: 0.2s; background: var(--accent); color: white; }
         .btn:hover { filter: brightness(1.1); }
-        .btn-init { background: #64748b; margin-bottom: 5px; }
         
         .route-item { padding: 15px 20px; border-bottom: 1px solid var(--border); cursor: pointer; transition: 0.2s; border-left: 4px solid transparent; }
         .route-item:hover { background: #f8fafc; }
         .route-item.active { background: #eff6ff; border-left: 4px solid var(--accent); }
         
         #map { flex-grow: 1; z-index: 1; background: #cbd5e1; position: relative; }
-        #dept-status { font-size: 10px; margin-top: 5px; color: #64748b; font-weight: 600; }
+        
+        /* Stavové kontrolky dole v panelu */
+        .status-bar { padding: 10px 20px; font-size: 10px; color: #94a3b8; border-top: 1px solid var(--border); display: flex; gap: 10px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #cbd5e1; }
+        .dot-green { background: #22c55e; }
 
-        /* Plovoucí Info Box (místo popupu) */
         #route-info-box {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 300px;
-            background: white;
-            z-index: 2000;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-            display: none; /* Schovaný, dokud se neklikne na trasu */
-            overflow: hidden;
-            border: 1px solid var(--border);
+            position: absolute; top: 20px; right: 20px; width: 300px; background: white; z-index: 2000;
+            border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); display: none; overflow: hidden; border: 1px solid var(--border);
         }
         .p-container { padding: 20px; }
         .p-header { border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-start; }
@@ -54,27 +47,24 @@
 <body>
 
 <div id="panel">
-    <div class="tab-nav">PROHLÍŽEČ TRAS</div>
+    <div class="tab-nav">ROUTE MASTER - ONLINE</div>
+    
     <div class="section">
-        <h1>1. Databáze tras</h1>
-        <input type="file" id="file-selector" accept=".json">
-    </div>
-    <div class="section">
-        <h1>2. Mapové podklady</h1>
-        <div id="dept-init-container">
-            <button class="btn btn-init" onclick="document.getElementById('geo-init').click()">📍 NAČÍST HRANICE DEPT</button>
-            <input type="file" id="geo-init" style="display:none" accept=".geojson,.json">
-        </div>
-        <div id="dept-status">Hranice nejsou načteny.</div>
-    </div>
-    <div class="section">
-        <h1>3. Vyhledávání</h1>
+        <h1>Vyhledávání</h1>
         <div style="display:flex; gap: 5px;">
-            <input type="text" id="viewerDept" placeholder="Dept (např. 85)" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:8px;">
+            <input type="text" id="viewerDept" placeholder="Zadej Dept (např. 85)" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:8px;">
             <button class="btn" style="width:auto; margin:0; padding:0 15px;" onclick="filterByDept()">ZOBRAZIT</button>
         </div>
     </div>
-    <div id="route-list" style="flex-grow:1; overflow-y:auto;"></div>
+
+    <div id="route-list" style="flex-grow:1; overflow-y:auto;">
+        <div style="padding:20px; color:#94a3b8; font-size:12px; text-align:center;">Načítání dat...</div>
+    </div>
+
+    <div class="status-bar">
+        <span><span id="dot-db" class="status-dot"></span> DB tras</span>
+        <span><span id="dot-geo" class="status-dot"></span> Hranice</span>
+    </div>
 </div>
 
 <div id="map">
@@ -110,35 +100,38 @@
     let highlightLayer = L.layerGroup().addTo(map);
     let borderLayer = L.layerGroup().addTo(map);
 
-    document.getElementById('geo-init').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                franceBorders = JSON.parse(e.target.result);
-                document.getElementById('dept-status').innerHTML = '<span style="color:#059669">● Hranice připraveny</span>';
-                document.getElementById('dept-init-container').style.display = 'none';
-            } catch (err) { alert('Chyba při čtení GeoJSONu.'); }
-        };
-        reader.readAsText(file);
-    });
+    // AUTOMATICKÉ NAČÍTÁNÍ PŘI STARTU STRÁNKY
+    async function initData() {
+        // 1. Načtení databáze tras
+        try {
+            const response = await fetch('database.json');
+            if (!response.ok) throw new Error();
+            allRoutes = await response.json();
+            document.getElementById('dot-db').classList.add('dot-green');
+            document.getElementById('route-list').innerHTML = '<div style="padding:20px; color:#94a3b8; font-size:12px; text-align:center;">Zadejte číslo departmentu výše.</div>';
+        } catch (err) {
+            document.getElementById('route-list').innerHTML = '<div style="padding:20px; color:#ef4444; font-size:12px;">Chyba: database.json nenalezen.</div>';
+        }
 
-    document.getElementById('file-selector').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                allRoutes = JSON.parse(e.target.result);
-                alert('Trasy načteny: ' + allRoutes.length);
-            } catch (err) { alert('Chyba při čtení databáze.'); }
-        };
-        reader.readAsText(file);
-    });
+        // 2. Načtení hranic
+        try {
+            const response = await fetch('france.json');
+            if (response.ok) {
+                franceBorders = await response.json();
+                document.getElementById('dot-geo').classList.add('dot-green');
+            }
+        } catch (err) {
+            console.log("Hranice france.json nejsou k dispozici.");
+        }
+    }
+
+    // Spuštění inicializace
+    initData();
 
     function filterByDept() {
         const deptInput = document.getElementById('viewerDept').value.trim();
+        if (!deptInput) return;
+        
         const deptClean = deptInput.padStart(2, '0');
         const container = document.getElementById('route-list');
         
@@ -158,7 +151,11 @@
         }
 
         const filtered = allRoutes.filter(r => r.dept === deptInput || r.dept === deptClean);
-        if (filtered.length === 0) return;
+        
+        if (filtered.length === 0) {
+            container.innerHTML = '<div style="padding:20px; color:#94a3b8; font-size:12px;">V tomto departmentu nejsou žádné trasy.</div>';
+            return;
+        }
 
         const groupBounds = L.latLngBounds();
 
@@ -194,7 +191,6 @@
             style: { color: '#003399', weight: 8, opacity: 1, lineJoin: 'round' } 
         }).addTo(highlightLayer);
 
-        // Naplnění a zobrazení Info Boxu místo Popupup
         document.getElementById('info-title').innerText = r.name;
         document.getElementById('info-dist').innerText = r.distance;
         document.getElementById('info-price').innerText = r.price || '---';
@@ -207,7 +203,6 @@
         }
 
         document.getElementById('route-info-box').style.display = 'block';
-
         map.flyToBounds(activeLayer.getBounds(), { padding: [100, 100], duration: 1 });
     }
 
