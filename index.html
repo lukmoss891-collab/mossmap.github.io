@@ -2,15 +2,16 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8" />
-    <title>MOSS ROUTES MANAGER</title>
+    <title>Route Master - PROHLÍŽEČ</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        :root { --accent: #1d4ed8; --dark: #003399; --border: #e2e8f0; --bg: #f8fafc; --gold: #f59e0b; }
+        :root { --accent: #1d4ed8; --dark: #003399; --border: #e2e8f0; --bg: #f8fafc; --gold: #f59e0b; --start-green: #22c55e; }
         body { margin: 0; font-family: 'IBM Plex Sans', sans-serif; display: flex; height: 100vh; overflow: hidden; background: var(--bg); }
         
+        /* ÚVODNÍ NAČÍTACÍ OBRAZOVKA */
         #loader-wrapper {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: radial-gradient(circle at center, #ffffff 0%, #f1f5f9 100%);
@@ -24,6 +25,30 @@
 
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
         @keyframes dots { 0% { content: ''; } 33% { content: '.'; } 66% { content: '..'; } 100% { content: '...'; } }
+
+        /* PULZUJÍCÍ BODY (GLOW DOTS) */
+        .glow-dot {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .glow-dot::before {
+            content: '';
+            position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px;
+            border-radius: 50%;
+            animation: pulse-glow 2s infinite;
+        }
+        .dot-start { background: var(--start-green); }
+        .dot-start::before { background: var(--start-green); opacity: 0.4; }
+        .dot-end { background: var(--accent); }
+        .dot-end::before { background: var(--accent); opacity: 0.4; }
+
+        @keyframes pulse-glow {
+            0% { transform: scale(1); opacity: 0.6; }
+            100% { transform: scale(3); opacity: 0; }
+        }
 
         #panel { width: 420px; border-right: 1px solid var(--border); background: white; display: flex; flex-direction: column; z-index: 1000; box-shadow: 4px 0 15px rgba(0,0,0,0.05); }
         .tab-nav { background: var(--accent); padding: 15px; color: white; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 1px; }
@@ -127,6 +152,7 @@
     let routeLayers = L.layerGroup().addTo(map);
     let highlightLayer = L.layerGroup().addTo(map);
     let borderLayer = L.layerGroup().addTo(map);
+    let markersLayer = L.layerGroup().addTo(map);
 
     async function initData() {
         setTimeout(() => {
@@ -169,6 +195,7 @@
         routeLayers.clearLayers();
         highlightLayer.clearLayers();
         borderLayer.clearLayers();
+        markersLayer.clearLayers();
         closeInfoBox();
 
         map.flyTo([46.6, 2.2], 6, { duration: 1.5 });
@@ -226,6 +253,7 @@
 
     function showRouteOnMap(r) {
         highlightLayer.clearLayers();
+        markersLayer.clearLayers();
         const box = document.getElementById('route-info-box');
         box.classList.remove('visible');
 
@@ -233,13 +261,24 @@
             style: { color: '#1d4ed8', weight: 8, opacity: 1, lineJoin: 'round' } 
         }).addTo(highlightLayer);
 
+        // VYTĚŽENÍ BODŮ PRO IKONKY
+        const coords = r.geometry.coordinates;
+        // OSRM dává souřadnice v LineStringu jako [lng, lat]
+        const startPoint = [coords[0][1], coords[0][0]];
+        const endPoint = [coords[coords.length - 1][1], coords[coords.length - 1][0]];
+
+        // PŘIDÁNÍ PULZUJÍCÍCH BODŮ
+        const startIcon = L.divIcon({ className: 'glow-dot dot-start', iconSize: [12, 12] });
+        const endIcon = L.divIcon({ className: 'glow-dot dot-end', iconSize: [12, 12] });
+
+        L.marker(startPoint, { icon: startIcon, interactive: false }).addTo(markersLayer);
+        L.marker(endPoint, { icon: endIcon, interactive: false }).addTo(markersLayer);
+
         setTimeout(() => {
             document.getElementById('info-title').innerText = r.name;
             document.getElementById('info-dist').innerText = r.distance;
-            
-            // Kontrola ceny: pokud je nula nebo neexistuje, dáme pomlčky
-            const priceVal = r.price ? parseFloat(r.price) : 0;
-            document.getElementById('info-price').innerText = priceVal > 0 ? priceVal : '---';
+            const p = parseFloat(r.price);
+            document.getElementById('info-price').innerText = (p && p > 0) ? p : '---';
             
             if (r.note) {
                 document.getElementById('info-note').innerText = r.note;
@@ -256,10 +295,9 @@
     function closeInfoBox() {
         document.getElementById('route-info-box').classList.remove('visible');
         highlightLayer.clearLayers();
+        markersLayer.clearLayers();
         document.querySelectorAll('.route-item').forEach(el => el.classList.remove('active'));
     }
 </script>
 </body>
 </html>
-
-
