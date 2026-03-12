@@ -2,15 +2,14 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8" />
-    <title>XXX ROUTES MANAGER</title>
+    <title>MOSS ROUTES MANAGER</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
     <style>
         :root { 
-            --accent: #ff0000; /* Splashscreen a UI prvky zůstávají červené */
-            --dark-blue: #0f172a; /* Původní tmavě modrá pro mapu */
+            --accent: #ff0000; 
             --dark: #0f172a; 
             --black: #000000;
             --white: #ffffff;
@@ -25,7 +24,8 @@
         /* JEMNĚ ŠEDÝ SPLASH SCREEN */
         #loader-wrapper {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: #f4f4f4;
+            background-color: #f4f4f4; /* Jemně šedé pozadí */
+            /* Decentní světlý rastr */
             background-image: repeating-linear-gradient(45deg, #eeeeee 0px, #eeeeee 2px, #f4f4f4 2px, #f4f4f4 10px);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             z-index: 9999; 
@@ -49,7 +49,7 @@
 
         .loader-title {
             font-family: 'IBM Plex Mono', monospace;
-            font-size: 22px;
+            font-size: 22px; /* Zvětšeno o ~20% */
             font-weight: 600;
             color: var(--black);
             letter-spacing: 1px;
@@ -61,14 +61,14 @@
         
         .rect {
             background: var(--accent);
-            height: 29px;
+            height: 29px; /* Zvětšeno o ~20% (z 24px) */
             width: 0;
             margin-bottom: 8px;
             animation: drawRect 1.2s cubic-bezier(0.7, 0, 0.3, 1) forwards;
         }
 
         .rect-thin {
-            height: 15px;
+            height: 15px; /* Zvětšeno o ~20% (z 12px) */
             animation-delay: 0.2s;
         }
 
@@ -80,7 +80,7 @@
         .loader-status {
             margin-top: 30px;
             font-family: 'IBM Plex Mono', monospace;
-            font-size: 15.5px;
+            font-size: 15.5px; /* Zvětšeno o ~20% (z 13px) */
             color: var(--black);
             font-weight: 400;
             letter-spacing: 0.5px;
@@ -136,8 +136,8 @@
         .glow-dot::before { content: ''; position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px; border-radius: 50%; animation: pulse-glow 2s infinite; }
         .dot-start { background: var(--start-green); }
         .dot-start::before { background: var(--start-green); opacity: 0.4; }
-        .dot-end { background: var(--dark-blue); }
-        .dot-end::before { background: var(--dark-blue); opacity: 0.4; }
+        .dot-end { background: var(--accent); }
+        .dot-end::before { background: var(--accent); opacity: 0.4; }
         @keyframes pulse-glow { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(3); opacity: 0; } }
     </style>
 </head>
@@ -145,7 +145,7 @@
 
 <div id="loader-wrapper">
     <div class="loader-content">
-        <div class="loader-title">XXX ROUTES MANAGER</div>
+        <div class="loader-title">MOSS ROUTES MANAGER (beta)</div>
         <div class="rect-container">
             <div class="rect"></div>
             <div class="rect rect-thin"></div>
@@ -158,7 +158,7 @@
 </div>
 
 <div id="panel">
-    <div class="tab-nav">SYSTEM TERMINAL / VIEW MODE</div>
+    <div class="tab-nav">MOSS ROUTES MANAGER</div>
     
     <div class="section">
         <h1>Vyhledávání</h1>
@@ -256,8 +256,7 @@
             const deptShape = franceBorders.features.find(f => f.properties.code === deptInput || f.properties.code === deptClean);
             if (deptShape) {
                 L.geoJSON(deptShape, {
-                    /* TMÁVĚ MODRÉ OHRANIČENÍ REGIONU */
-                    style: { color: '#0f172a', weight: 4, fillColor: '#ffffff', fillOpacity: 0.1 }
+                    style: { color: '#ff0000', weight: 4, fillColor: '#ffffff', fillOpacity: 0.2 }
                 }).addTo(borderLayer);
             }
         }
@@ -275,12 +274,9 @@
             div.innerHTML = `<strong>${prefBadge}${r.name}</strong><br><small>${r.distance} km</small>`;
             div.onclick = () => activateRoute(r, div);
             container.appendChild(div);
-            
-            /* GHOST TRASY NA BÍLO */
             L.geoJSON(r.geometry, { style: { color: '#000', weight: 7, opacity: 0.1 } }).addTo(routeLayers);
-            const ghost = L.geoJSON(r.geometry, { style: { color: '#ffffff', weight: 4, opacity: 0.7, cursor: 'pointer' } }).addTo(routeLayers);
+            const ghost = L.geoJSON(r.geometry, { style: { color: '#fff', weight: 4, opacity: 0.5, cursor: 'pointer' } }).addTo(routeLayers);
             ghost.on('click', () => activateRoute(r, div));
-            
             if (r.preferred) { preferredRoute = r; preferredElement = div; }
         });
         if (preferredRoute) { activateRoute(preferredRoute, preferredElement); }
@@ -297,10 +293,7 @@
         markersLayer.clearLayers();
         const box = document.getElementById('route-info-box');
         box.classList.remove('visible');
-        
-        /* AKTIVNÍ TRASA JAKO TMÁVĚ MODRÁ */
-        const activeLayer = L.geoJSON(r.geometry, { style: { color: '#0f172a', weight: 7, opacity: 1, lineJoin: 'round' } }).addTo(highlightLayer);
-        
+        const activeLayer = L.geoJSON(r.geometry, { style: { color: '#ff0000', weight: 7, opacity: 1, lineJoin: 'round' } }).addTo(highlightLayer);
         const coords = r.geometry.coordinates;
         const startPoint = [coords[0][1], coords[0][0]];
         const endPoint = [coords[coords.length - 1][1], coords[coords.length - 1][0]];
@@ -308,7 +301,6 @@
         const endIcon = L.divIcon({ className: 'glow-dot dot-end', iconSize: [12, 12] });
         L.marker(startPoint, { icon: startIcon, interactive: false }).addTo(markersLayer);
         L.marker(endPoint, { icon: endIcon, interactive: false }).addTo(markersLayer);
-        
         setTimeout(() => {
             document.getElementById('info-title').innerText = r.name;
             document.getElementById('info-dist').innerText = r.distance;
