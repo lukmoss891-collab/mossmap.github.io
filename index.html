@@ -275,7 +275,7 @@
             div.onclick = () => activateRoute(r, div);
             container.appendChild(div);
             L.geoJSON(r.geometry, { style: { color: '#000', weight: 7, opacity: 0.1 } }).addTo(routeLayers);
-            const ghost = L.geoJSON(r.geometry, { style: { color: '#fff', weight: 4, opacity: 0.5, cursor: 'pointer' } }).addTo(routeLayers);
+            const ghost = L.geoJSON(r.geometry, { style: { color: '#ffffff', weight: 4, opacity: 1, cursor: 'pointer' } }).addTo(routeLayers);
             ghost.on('click', () => activateRoute(r, div));
             if (r.preferred) { preferredRoute = r; preferredElement = div; }
         });
@@ -326,5 +326,6 @@
 </script>
 </body>
 </html>
+
 
 
