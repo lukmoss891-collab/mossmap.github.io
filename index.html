@@ -11,7 +11,6 @@
         :root { 
             --accent: #ff0000; 
             --dark-blue: #0f172a; 
-            --dark: #0f172a; 
             --black: #000000;
             --white: #ffffff;
             --border: #e2e8f0; 
@@ -27,72 +26,19 @@
             background-color: #f4f4f4;
             background-image: repeating-linear-gradient(45deg, #eeeeee 0px, #eeeeee 2px, #f4f4f4 2px, #f4f4f4 10px);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 9999; 
-            transition: opacity 0.8s ease, visibility 0.8s ease;
-            opacity: 1;
-            visibility: visible;
+            z-index: 9999; transition: opacity 0.8s ease, visibility 0.8s ease; opacity: 1; visibility: visible;
         }
+        #loader-wrapper.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 
-        #loader-wrapper.hidden {
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-        }
-
-        .loader-content { 
-            width: max-content; 
-            position: relative;
-            padding: 40px;
-            text-align: left;
-        }
-
-        .loader-title {
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 22px;
-            font-weight: 600;
-            color: var(--black);
-            letter-spacing: 1px;
-            margin-bottom: 15px;
-            white-space: nowrap;
-        }
-
+        .loader-content { width: max-content; position: relative; padding: 40px; text-align: left; }
+        .loader-title { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; color: var(--black); letter-spacing: 1px; margin-bottom: 15px; white-space: nowrap; }
         .rect-container { width: 100%; }
-        
-        .rect {
-            background: var(--accent);
-            height: 29px;
-            width: 0;
-            margin-bottom: 8px;
-            animation: drawRect 1.2s cubic-bezier(0.7, 0, 0.3, 1) forwards;
-        }
+        .rect { background: var(--accent); height: 29px; width: 0; margin-bottom: 8px; animation: drawRect 1.2s cubic-bezier(0.7, 0, 0.3, 1) forwards; }
+        .rect-thin { height: 15px; animation-delay: 0.2s; }
+        @keyframes drawRect { from { width: 0; } to { width: 100%; } }
 
-        .rect-thin {
-            height: 15px;
-            animation-delay: 0.2s;
-        }
-
-        @keyframes drawRect {
-            from { width: 0; }
-            to { width: 100%; }
-        }
-
-        .loader-status {
-            margin-top: 30px;
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 15.5px;
-            color: var(--black);
-            font-weight: 400;
-            letter-spacing: 0.5px;
-            opacity: 0;
-            animation: fadeInStatus 0.5s ease forwards 0.8s;
-        }
-
-        .loader-status div { margin-bottom: 8px; }
-
-        @keyframes fadeInStatus {
-            from { opacity: 0; transform: translateY(5px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        .loader-status { margin-top: 30px; font-family: 'IBM Plex Mono', monospace; font-size: 15.5px; color: var(--black); font-weight: 400; letter-spacing: 0.5px; opacity: 0; animation: fadeInStatus 0.5s ease forwards 0.8s; }
+        @keyframes fadeInStatus { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
         #panel { width: 420px; border-right: 1px solid var(--border); background: white; display: flex; flex-direction: column; z-index: 1000; box-shadow: 4px 0 15px rgba(0,0,0,0.05); }
         .tab-nav { background: var(--black); padding: 15px; color: white; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 2px; border-bottom: 3px solid var(--accent); }
@@ -104,9 +50,7 @@
         .btn:hover { background: var(--accent); }
         
         .route-item { padding: 15px 20px; border-bottom: 1px solid var(--border); cursor: pointer; transition: 0.2s; border-left: 4px solid transparent; }
-        .route-item:hover { background: #f8fafc; }
         .route-item.active { background: #fff1f2; border-left: 4px solid var(--accent); }
-        .badge-pref { color: var(--gold); font-weight: bold; margin-right: 4px; }
         
         #map { flex-grow: 1; z-index: 1; background: #cbd5e1; position: relative; }
         
@@ -150,24 +94,24 @@
         </div>
         <div class="loader-status">
             <div>- načítám mapové podklady...</div>
-            <div>- načítám trasy...</div>
+            <div>- připravuji databázi...</div>
         </div>
     </div>
 </div>
 
 <div id="panel">
-    <div class="tab-nav">SYSTEM TERMINAL / VIEW MODE</div>
+    <div class="tab-nav">SYSTEM TERMINAL / AUTO-LOAD MODE</div>
     
     <div class="section">
-        <h1>Vyhledávání</h1>
+        <h1>Vyhledávání dle sektoru</h1>
         <div style="display:flex; gap: 5px;">
-            <input type="text" id="viewerDept" placeholder="Zadej Dept (např. 85)" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:8px; font-family: 'IBM Plex Mono';">
-            <button class="btn" style="width:auto; margin:0; padding:0 15px;" onclick="filterByDept()">ZOBRAZIT</button>
+            <input type="text" id="viewerDept" placeholder="Zadej Dept (např. 44)" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:8px; font-family: 'IBM Plex Mono';">
+            <button class="btn" style="width:auto; margin:0; padding:0 15px;" onclick="filterByDept()">NAČÍST</button>
         </div>
     </div>
 
     <div id="route-list" style="flex-grow:1; overflow-y:auto;">
-        <div style="padding:20px; color:#94a3b8; font-size:12px; text-align:center;">Systém připraven k vyhledávání.</div>
+        <div style="padding:20px; color:#94a3b8; font-size:12px; text-align:center;">Zadejte číslo sektoru pro okamžité zobrazení trasy.</div>
     </div>
 
     <div class="status-bar">
@@ -180,7 +124,7 @@
     <div id="route-info-box">
         <div class="p-container">
             <div class="p-header">
-                <span id="info-title" class="p-title">Název trasy</span>
+                <span id="info-title" class="p-title">---</span>
                 <span class="p-close" onclick="closeInfoBox()">&times;</span>
             </div>
             <div class="p-row">
@@ -205,12 +149,11 @@
     const map = L.map('map', { zoomControl: false }).setView([46.6, 2.2], 6);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
     
-    let routeLayers = L.layerGroup().addTo(map);
     let highlightLayer = L.layerGroup().addTo(map);
     let borderLayer = L.layerGroup().addTo(map);
     let markersLayer = L.layerGroup().addTo(map);
 
-    // DEKODÉR: Převede řetězec z klíče "geom" na pole souřadnic pro Leaflet [lat, lng]
+    // DEKODÉR: Převede řetězec z klíče "geom" na pole [lat, lng]
     function decodePolyline(str) {
         let index = 0, lat = 0, lng = 0, coords = [], shift, result, byte;
         while (index < str.length) {
@@ -225,149 +168,83 @@
         return coords;
     }
 
-    // Funkce pro získání souřadnic trasy bez ohledu na formát JSONu
-    function getLatLngs(r) {
-        // 1. Zkusíme nový formát (klíč "geom")
-        if (r.geom && typeof r.geom === 'string') {
-            return decodePolyline(r.geom);
-        }
-        // 2. Zkusíme starý formát (klíč "geometry" s GeoJSON strukturou)
-        if (r.geometry && r.geometry.coordinates) {
-            return r.geometry.coordinates.map(coord => [coord[1], coord[0]]);
-        }
-        return null;
-    }
-
     async function initData() {
-        setTimeout(() => {
-            const loader = document.getElementById('loader-wrapper');
-            if(loader) loader.classList.add('hidden');
-        }, 3000);
-
+        setTimeout(() => document.getElementById('loader-wrapper').classList.add('hidden'), 2500);
         try {
-            const response = await fetch('routes.json');
-            if (!response.ok) throw new Error();
-            allRoutes = await response.json();
+            const r = await fetch('routes.json');
+            allRoutes = await r.json();
             document.getElementById('dot-db').classList.add('dot-green');
-        } catch (err) {
-            document.getElementById('route-list').innerHTML = '<div style="padding:20px; color:#ef4444; font-size:12px;">DATABASE NOT FOUND.</div>';
-        }
+        } catch (e) { console.error("DB error"); }
 
         try {
-            const response = await fetch('france.json');
-            if (response.ok) {
-                franceBorders = await response.json();
-                document.getElementById('dot-geo').classList.add('dot-green');
-            }
-        } catch (err) {
-            console.log("France geodata missing.");
-        }
+            const r = await fetch('france.json');
+            franceBorders = await r.json();
+            document.getElementById('dot-geo').classList.add('dot-green');
+        } catch (e) { console.error("Geo error"); }
     }
-
     initData();
 
     function filterByDept() {
-        const deptInput = document.getElementById('viewerDept').value.trim();
-        if (!deptInput) return;
-        const deptClean = deptInput.padStart(2, '0');
+        const val = document.getElementById('viewerDept').value.trim();
+        if (!val) return;
+        
+        const deptClean = val.padStart(2, '0');
         const container = document.getElementById('route-list');
-        container.innerHTML = '';
-        routeLayers.clearLayers();
+        
+        // Reset mapy
         highlightLayer.clearLayers();
         borderLayer.clearLayers();
         markersLayer.clearLayers();
         closeInfoBox();
-        
+
+        // Hranice sektoru
         if (franceBorders) {
-            const deptShape = franceBorders.features.find(f => f.properties.code === deptInput || f.properties.code === deptClean);
-            if (deptShape) {
-                L.geoJSON(deptShape, {
-                    style: { color: '#0f172a', weight: 4, fillColor: '#ffffff', fillOpacity: 0.1 }
-                }).addTo(borderLayer);
-            }
+            const shape = franceBorders.features.find(f => f.properties.code === val || f.properties.code === deptClean);
+            if (shape) L.geoJSON(shape, { style: { color: '#0f172a', weight: 3, fillColor: '#000', fillOpacity: 0.05 } }).addTo(borderLayer);
         }
 
-        const filtered = allRoutes.filter(r => String(r.dept) === String(deptInput) || String(r.dept) === String(deptClean));
-        if (filtered.length === 0) {
-            container.innerHTML = '<div style="padding:20px; color:#94a3b8; font-size:12px;">Žádné trasy v tomto sektoru.</div>';
+        // Najít trasu
+        const route = allRoutes.find(r => String(r.dept) === val || String(r.dept) === deptClean);
+        
+        if (!route) {
+            container.innerHTML = '<div style="padding:20px; color:#94a3b8; font-size:12px;">Sektor nenalezen.</div>';
             return;
         }
 
-        let preferredRoute = null;
-        let preferredElement = null;
+        // UI seznamu
+        container.innerHTML = `
+            <div class="route-item active">
+                <strong>${route.name}</strong><br>
+                <small>Sektor: ${route.dept} | ${route.distance} km</small>
+            </div>`;
 
-        filtered.forEach(r => {
-            const latlngs = getLatLngs(r);
-            if (!latlngs) return;
-
-            const div = document.createElement('div');
-            div.className = 'route-item';
-            const prefBadge = r.preferred ? '<span class="badge-pref">★</span> ' : '';
-            div.innerHTML = `<strong>${prefBadge}${r.name}</strong><br><small>${r.distance} km</small>`;
-            div.onclick = () => activateRoute(r, div);
-            container.appendChild(div);
-            
-            // Vykreslení neaktivních tras
-            L.polyline(latlngs, { color: '#000', weight: 7, opacity: 0.1 }).addTo(routeLayers);
-            const ghost = L.polyline(latlngs, { color: '#ffffff', weight: 4, opacity: 0.7, cursor: 'pointer' }).addTo(routeLayers);
-            ghost.on('click', () => activateRoute(r, div));
-            
-            if (r.preferred) { preferredRoute = r; preferredElement = div; }
-        });
-        if (preferredRoute) { activateRoute(preferredRoute, preferredElement); }
-    }
-
-    function activateRoute(r, element) {
-        document.querySelectorAll('.route-item').forEach(el => el.classList.remove('active'));
-        if (element) element.classList.add('active');
-        showRouteOnMap(r);
-    }
-
-    function showRouteOnMap(r) {
-        highlightLayer.clearLayers();
-        markersLayer.clearLayers();
-        const box = document.getElementById('route-info-box');
-        box.classList.remove('visible');
+        // OKAMŽITÉ VYKRESLENÍ
+        const latlngs = decodePolyline(route.geom);
+        const poly = L.polyline(latlngs, { color: '#0f172a', weight: 6, opacity: 1, lineJoin: 'round' }).addTo(highlightLayer);
         
-        const latlngs = getLatLngs(r);
-        if (!latlngs || latlngs.length === 0) return;
-        
-        const activeLayer = L.polyline(latlngs, { 
-            color: '#0f172a', weight: 7, opacity: 1, lineJoin: 'round' 
-        }).addTo(highlightLayer);
-        
-        // Body Start a Cíl
-        const startPoint = latlngs[0];
-        const endPoint = latlngs[latlngs.length - 1];
-        
+        // Markery
         const startIcon = L.divIcon({ className: 'glow-dot dot-start', iconSize: [12, 12] });
         const endIcon = L.divIcon({ className: 'glow-dot dot-end', iconSize: [12, 12] });
-        
-        L.marker(startPoint, { icon: startIcon, interactive: false }).addTo(markersLayer);
-        L.marker(endPoint, { icon: endIcon, interactive: false }).addTo(markersLayer);
-        
-        setTimeout(() => {
-            document.getElementById('info-title').innerText = r.name;
-            document.getElementById('info-dist').innerText = r.distance;
-            const p = parseFloat(r.price);
-            document.getElementById('info-price').innerText = (p && p > 0) ? p : '---';
-            if (r.note) {
-                document.getElementById('info-note').innerText = r.note;
-                document.getElementById('info-note-container').style.display = 'block';
-            } else {
-                document.getElementById('info-note-container').style.display = 'none';
-            }
-            box.classList.add('visible');
-        }, 50);
-        
-        map.flyToBounds(activeLayer.getBounds(), { padding: [100, 100], duration: 1 });
+        L.marker(latlngs[0], { icon: startIcon }).addTo(markersLayer);
+        L.marker(latlngs[latlngs.length - 1], { icon: endIcon }).addTo(markersLayer);
+
+        // Info box
+        document.getElementById('info-title').innerText = route.name;
+        document.getElementById('info-dist').innerText = route.distance;
+        document.getElementById('info-price').innerText = route.price || '---';
+        if (route.note) {
+            document.getElementById('info-note').innerText = route.note;
+            document.getElementById('info-note-container').style.display = 'block';
+        } else {
+            document.getElementById('info-note-container').style.display = 'none';
+        }
+        document.getElementById('route-info-box').classList.add('visible');
+
+        map.flyToBounds(poly.getBounds(), { padding: [80, 80], duration: 1.2 });
     }
 
     function closeInfoBox() {
         document.getElementById('route-info-box').classList.remove('visible');
-        highlightLayer.clearLayers();
-        markersLayer.clearLayers();
-        document.querySelectorAll('.route-item').forEach(el => el.classList.remove('active'));
     }
 </script>
 </body>
