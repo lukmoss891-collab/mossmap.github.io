@@ -8,35 +8,75 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        :root { --accent: #ff0000; --dark: #0f172a; --black: #000000; --white: #ffffff; --border: #e2e8f0; --bg: #f8fafc; --gold: #f59e0b; --start-green: #22c55e; }
+        :root { 
+            --accent: #ff0000; 
+            --dark: #0f172a; 
+            --black: #000000;
+            --white: #ffffff;
+            --border: #e2e8f0; 
+            --bg: #f8fafc; 
+            --gold: #f59e0b; 
+            --start-green: #22c55e; 
+        }
+
         body { margin: 0; font-family: 'IBM Plex Sans', sans-serif; display: flex; height: 100vh; overflow: hidden; background: var(--bg); }
-        #loader-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #f4f4f4; background-image: repeating-linear-gradient(45deg, #eeeeee 0px, #eeeeee 2px, #f4f4f4 2px, #f4f4f4 10px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.8s ease; }
+        
+        /* PŮVODNÍ SPLASH SCREEN */
+        #loader-wrapper {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #f4f4f4;
+            background-image: repeating-linear-gradient(45deg, #eeeeee 0px, #eeeeee 2px, #f4f4f4 2px, #f4f4f4 10px);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 9999; 
+            transition: opacity 0.8s ease, visibility 0.8s ease;
+            opacity: 1;
+            visibility: visible;
+        }
+
         #loader-wrapper.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-        .loader-content { width: max-content; padding: 40px; }
-        .loader-title { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; color: var(--black); margin-bottom: 15px; }
-        .rect { background: var(--accent); height: 29px; width: 100%; margin-bottom: 8px; }
-        #panel { width: 420px; border-right: 1px solid var(--border); background: white; display: flex; flex-direction: column; z-index: 1000; }
+        .loader-content { width: max-content; position: relative; padding: 40px; text-align: left; }
+        .loader-title { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; color: var(--black); letter-spacing: 1px; margin-bottom: 15px; white-space: nowrap; }
+        .rect-container { width: 100%; }
+        .rect { background: var(--accent); height: 29px; width: 0; margin-bottom: 8px; animation: drawRect 1.2s cubic-bezier(0.7, 0, 0.3, 1) forwards; }
+        .rect-thin { height: 15px; animation-delay: 0.2s; }
+        @keyframes drawRect { from { width: 0; } to { width: 100%; } }
+        .loader-status { margin-top: 30px; font-family: 'IBM Plex Mono', monospace; font-size: 15.5px; color: var(--black); font-weight: 400; letter-spacing: 0.5px; opacity: 0; animation: fadeInStatus 0.5s ease forwards 0.8s; }
+        @keyframes fadeInStatus { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* UI */
+        #panel { width: 420px; border-right: 1px solid var(--border); background: white; display: flex; flex-direction: column; z-index: 1000; box-shadow: 4px 0 15px rgba(0,0,0,0.05); }
         .tab-nav { background: var(--black); padding: 15px; color: white; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 2px; border-bottom: 3px solid var(--accent); }
         .section { padding: 20px; border-bottom: 1px solid var(--border); }
-        h1 { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 15px 0; display: flex; align-items: center; gap: 8px; }
+        h1 { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 15px 0; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; }
         h1::before { content: ''; width: 3px; height: 12px; background: var(--accent); border-radius: 2px; }
-        .btn { width: 100%; padding: 12px; cursor: pointer; border-radius: 8px; border: none; font-weight: 600; font-size: 13px; background: var(--black); color: white; }
+        
+        .btn { width: 100%; padding: 12px; cursor: pointer; border-radius: 8px; border: none; font-weight: 600; font-size: 13px; transition: 0.2s; background: var(--black); color: white; }
         .btn:hover { background: var(--accent); }
-        .route-item { padding: 15px 20px; border-bottom: 1px solid var(--border); cursor: pointer; transition: 0.2s; }
+        
+        .route-item { padding: 15px 20px; border-bottom: 1px solid var(--border); cursor: pointer; transition: 0.2s; border-left: 4px solid transparent; }
         .route-item:hover { background: #f8fafc; }
         .route-item.active { background: #fff1f2; border-left: 4px solid var(--accent); }
+        
         #map { flex-grow: 1; z-index: 1; background: #cbd5e1; position: relative; }
-        #route-info-box { position: absolute; top: 20px; right: 20px; width: 300px; background: white; z-index: 2000; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); opacity: 0; transform: translateX(20px); transition: 0.4s; pointer-events: none; }
-        #route-info-box.visible { opacity: 1; transform: translateX(0); pointer-events: auto; }
+        #route-info-box {
+            position: absolute; top: 20px; right: 20px; width: 300px; background: white; z-index: 2000;
+            border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); border: 1px solid var(--border);
+            overflow: hidden; transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: translateX(20px); opacity: 0; pointer-events: none;
+        }
+        #route-info-box.visible { transform: translateX(0); opacity: 1; pointer-events: auto; }
+
         .p-container { padding: 20px; }
         .p-header { border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px; display: flex; justify-content: space-between; }
-        .p-title { font-weight: 700; font-size: 16px; }
-        .p-row { display: flex; align-items: center; margin-bottom: 10px; font-size: 13px; }
-        .p-note { background: #f8fafc; border-radius: 8px; padding: 12px; font-size: 12px; border-left: 4px solid var(--accent); margin-top: 12px; }
+        .p-title { color: var(--black); font-weight: 700; font-size: 16px; }
+        .p-row { display: flex; align-items: center; margin-bottom: 10px; font-size: 13px; color: #334155; }
+        .p-note { background: #f8fafc; border-radius: 8px; padding: 12px; font-size: 12px; color: #475569; margin-top: 12px; border-left: 4px solid var(--accent); line-height: 1.5; }
+
         .glow-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; position: relative; }
         .dot-start { background: var(--start-green); }
         .dot-end { background: var(--accent); }
-        .status-bar { padding: 10px 20px; font-size: 10px; color: #94a3b8; border-top: 1px solid var(--border); display: flex; gap: 10px; }
+        
+        .status-bar { padding: 10px 20px; font-size: 10px; color: #94a3b8; border-top: 1px solid var(--border); display: flex; gap: 10px; background: white; }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #cbd5e1; }
         .dot-green { background: var(--start-green); }
     </style>
@@ -45,8 +85,15 @@
 
 <div id="loader-wrapper">
     <div class="loader-content">
-        <div class="loader-title">MOSS ROUTES MANAGER</div>
-        <div class="rect"></div>
+        <div class="loader-title">MOSS ROUTES MANAGER (beta)</div>
+        <div class="rect-container">
+            <div class="rect"></div>
+            <div class="rect rect-thin"></div>
+        </div>
+        <div class="loader-status">
+            <div>- načítám mapové podklady...</div>
+            <div>- načítám trasy...</div>
+        </div>
     </div>
 </div>
 
@@ -55,13 +102,16 @@
     <div class="section">
         <h1>Vyhledávání</h1>
         <div style="display:flex; gap: 5px;">
-            <input type="text" id="viewerDept" placeholder="Dept (např. 85)" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:8px;">
+            <input type="text" id="viewerDept" placeholder="Zadej Dept (např. 85)" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:8px;">
             <button class="btn" style="width:auto; padding:0 15px;" onclick="filterByDept()">ZOBRAZIT</button>
         </div>
     </div>
-    <div id="route-list" style="flex-grow:1; overflow-y:auto;"></div>
+    <div id="route-list" style="flex-grow:1; overflow-y:auto;">
+        <div style="padding:20px; color:#94a3b8; font-size:12px; text-align:center;">Systém připraven k vyhledávání.</div>
+    </div>
     <div class="status-bar">
         <span><span id="dot-db" class="status-dot"></span> DATABASE</span>
+        <span><span id="dot-geo" class="status-dot"></span> GEODATA</span>
     </div>
 </div>
 
@@ -69,8 +119,8 @@
     <div id="route-info-box">
         <div class="p-container">
             <div class="p-header">
-                <span id="info-title" class="p-title"></span>
-                <span style="cursor:pointer" onclick="closeInfoBox()">&times;</span>
+                <span id="info-title" class="p-title">Název trasy</span>
+                <span style="cursor:pointer; font-size:20px;" onclick="closeInfoBox()">&times;</span>
             </div>
             <div class="p-row">📏 <b>Vzdálenost:</b>&nbsp;<span id="info-dist"></span> km</div>
             <div class="p-row">💶 <b>Cena:</b>&nbsp;<span id="info-price"></span> €</div>
@@ -81,11 +131,14 @@
 
 <script>
     let allRoutes = [];
+    let franceBorders = null;
+    
     const map = L.map('map', { zoomControl: false }).setView([46.6, 2.2], 6);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     
-    let routeLayers = L.layerGroup().addTo(map);
+    let routeLayers = L.featureGroup().addTo(map); // Používáme featureGroup pro snadné flyToBounds
     let highlightLayer = L.layerGroup().addTo(map);
+    let borderLayer = L.layerGroup().addTo(map);
     let markersLayer = L.layerGroup().addTo(map);
 
     function decodePolyline(str) {
@@ -97,20 +150,24 @@
             shift = 0; result = 0;
             do { byte = str.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
             lng += ((result & 1) ? ~(result >> 1) : (result >> 1));
-            coords.push([lat / 1e5, lng / 1e5]); // Leaflet chce [lat, lng]
+            coords.push([lat / 1e5, lng / 1e5]);
         }
         return coords;
     }
 
     async function initData() {
+        setTimeout(() => { document.getElementById('loader-wrapper').classList.add('hidden'); }, 3000);
         try {
             const res = await fetch('routes.json');
             allRoutes = await res.json();
             document.getElementById('dot-db').classList.add('dot-green');
-            setTimeout(() => document.getElementById('loader-wrapper').classList.add('hidden'), 1000);
-        } catch (e) {
-            document.getElementById('route-list').innerHTML = "Chyba načítání dat.";
-        }
+        } catch (e) { console.error("Routes error"); }
+
+        try {
+            const res = await fetch('france.json');
+            franceBorders = await res.json();
+            document.getElementById('dot-geo').classList.add('dot-green');
+        } catch (e) { console.error("Geo error"); }
     }
     initData();
 
@@ -121,41 +178,58 @@
         const container = document.getElementById('route-list');
         container.innerHTML = '';
         routeLayers.clearLayers();
+        borderLayer.clearLayers();
+        highlightLayer.clearLayers();
+        markersLayer.clearLayers();
         closeInfoBox();
 
-        // Filtrování (shoda Dept jako stringu i čísla)
+        // 1. Zobrazení hranic departmentu
+        if (franceBorders) {
+            const deptShape = franceBorders.features.find(f => String(f.properties.code) === val);
+            if (deptShape) {
+                L.geoJSON(deptShape, {
+                    style: { color: '#ff0000', weight: 3, fillColor: '#ff0000', fillOpacity: 0.1, dashArray: '5, 10' }
+                }).addTo(borderLayer);
+            }
+        }
+
+        // 2. Filtrování a okamžité vykreslení VŠECH tras
         const filtered = allRoutes.filter(r => String(r.dept) === val);
         
         if (filtered.length === 0) {
-            container.innerHTML = '<div style="padding:20px; color:#94a3b8;">Nic nenalezeno.</div>';
+            container.innerHTML = '<div style="padding:20px; color:#94a3b8;">Sektor bez tras.</div>';
             return;
         }
 
         filtered.forEach(r => {
             const coords = decodePolyline(r.geom);
+            const polyline = L.polyline(coords, { color: '#000', weight: 4, opacity: 0.2 }).addTo(routeLayers);
+            
             const div = document.createElement('div');
             div.className = 'route-item';
             div.innerHTML = `<strong>${r.name}</strong><br><small>${r.distance} km</small>`;
-            div.onclick = () => {
-                document.querySelectorAll('.route-item').forEach(el => el.classList.remove('active'));
-                div.classList.add('active');
-                showOnMap(r, coords);
-            };
+            div.onclick = () => activateRoute(r, div, coords);
             container.appendChild(div);
 
-            // Neviditelná tlustá čára pro klikání přímo na mapě
-            const clickLayer = L.polyline(coords, { color: 'transparent', weight: 20 }).addTo(routeLayers);
-            clickLayer.on('click', () => div.click());
+            polyline.on('click', () => div.click());
         });
+
+        // 3. Automatický zoom na vše najednou (Department + Trasy)
+        const combinedBounds = L.featureGroup([routeLayers, borderLayer]).getBounds();
+        if (combinedBounds.isValid()) {
+            map.flyToBounds(combinedBounds, { padding: [50, 50], duration: 1.5 });
+        }
     }
 
-    function showOnMap(r, coords) {
+    function activateRoute(r, element, coords) {
+        document.querySelectorAll('.route-item').forEach(el => el.classList.remove('active'));
+        if (element) element.classList.add('active');
+        
         highlightLayer.clearLayers();
         markersLayer.clearLayers();
 
-        const line = L.polyline(coords, { color: '#ff0000', weight: 5, lineJoin: 'round' }).addTo(highlightLayer);
+        const activeLine = L.polyline(coords, { color: '#ff0000', weight: 6, lineJoin: 'round', zIndexOffset: 1000 }).addTo(highlightLayer);
         
-        // Start a Cíl z pole wps (v novém JSONu je to r.wps[].l)
         if (r.wps && r.wps.length >= 2) {
             const start = r.wps[0].l;
             const end = r.wps[r.wps.length - 1].l;
@@ -166,7 +240,6 @@
         document.getElementById('info-title').innerText = r.name;
         document.getElementById('info-dist').innerText = r.distance;
         document.getElementById('info-price').innerText = r.price || '---';
-        
         if (r.note) {
             document.getElementById('info-note').innerText = r.note;
             document.getElementById('info-note-container').style.display = 'block';
@@ -175,13 +248,14 @@
         }
 
         document.getElementById('route-info-box').classList.add('visible');
-        map.flyToBounds(line.getBounds(), { padding: [50, 50] });
+        map.flyToBounds(activeLine.getBounds(), { padding: [100, 100], duration: 1 });
     }
 
     function closeInfoBox() {
         document.getElementById('route-info-box').classList.remove('visible');
         highlightLayer.clearLayers();
         markersLayer.clearLayers();
+        document.querySelectorAll('.route-item').forEach(el => el.classList.remove('active'));
     }
 </script>
 </body>
