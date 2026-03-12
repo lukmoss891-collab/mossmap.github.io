@@ -136,7 +136,7 @@
         }, 2000);
 
         try {
-            const response = await fetch('database.json');
+            const response = await fetch('routes.json');
             if (!response.ok) throw new Error();
             allRoutes = await response.json();
             document.getElementById('dot-db').classList.add('dot-green');
@@ -261,3 +261,4 @@
 </script>
 </body>
 </html>
+
