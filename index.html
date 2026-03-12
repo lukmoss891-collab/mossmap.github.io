@@ -113,7 +113,7 @@
 
     async function initData() {
         try {
-            const response = await fetch('routes.json');
+            const response = await fetch('database.json');
             if (!response.ok) throw new Error();
             allRoutes = await response.json();
             document.getElementById('dot-db').classList.add('dot-green');
@@ -215,7 +215,7 @@
         box.classList.remove('visible');
 
         const activeLayer = L.geoJSON(r.geometry, { 
-            style: { color: '#003399', weight: 8, opacity: 1, lineJoin: 'round' } 
+            style: { color: '#1d4ed8', weight: 8, opacity: 1, lineJoin: 'round' } 
         }).addTo(highlightLayer);
 
         setTimeout(() => {
