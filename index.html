@@ -31,30 +31,29 @@
         .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #cbd5e1; }
         .dot-green { background: #22c55e; }
 
-       #route-info-box {
-    position: absolute; 
-    top: 20px; 
-    right: 20px; 
-    width: 300px; 
-    background: white; 
-    z-index: 2000;
-    border-radius: 12px; 
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
-    border: 1px solid var(--border);
-    overflow: hidden;
-    
-    /* Animace */
-    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
-    transform: translateX(20px); /* Výchozí pozice mírně vpravo */
-    opacity: 0;
-    pointer-events: none; /* Dokud není aktivní, nebrání klikání v mapě */
-}
+        /* VYLEPŠENÝ INFO BOX S ANIMACÍ */
+        #route-info-box {
+            position: absolute; top: 20px; right: 20px; width: 300px; background: white; z-index: 2000;
+            border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); border: 1px solid var(--border);
+            overflow: hidden;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+            transform: translateX(20px);
+            opacity: 0;
+            pointer-events: none;
+        }
+        #route-info-box.visible {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
 
-#route-info-box.visible {
-    transform: translateX(0); /* Přijede na své místo */
-    opacity: 1;
-    pointer-events: auto;
-}
+        .p-container { padding: 20px; }
+        .p-header { border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-start; }
+        .p-title { color: var(--dark); font-weight: 700; font-size: 16px; line-height: 1.2; }
+        .p-close { cursor: pointer; color: #94a3b8; font-size: 20px; line-height: 1; }
+        .p-row { display: flex; align-items: center; margin-bottom: 10px; font-size: 13px; color: #334155; }
+        .p-icon { width: 28px; font-size: 16px; }
+        .p-note { background: #f8fafc; border-radius: 8px; padding: 12px; font-size: 12px; color: #475569; margin-top: 12px; border-left: 4px solid #cbd5e1; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -115,7 +114,7 @@
 
     async function initData() {
         try {
-            const response = await fetch('routes.json');
+            const response = await fetch('database.json');
             if (!response.ok) throw new Error();
             allRoutes = await response.json();
             document.getElementById('dot-db').classList.add('dot-green');
@@ -173,13 +172,11 @@
         filtered.forEach(r => {
             const div = document.createElement('div');
             div.className = 'route-item';
-            // Pokud je trasa preferred, přidáme hvězdičku
             const prefBadge = r.preferred ? '<span class="badge-pref">★</span> ' : '';
             div.innerHTML = `<strong>${prefBadge}${r.name}</strong><br><small>${r.distance} km</small>`;
             div.onclick = () => activateRoute(r, div);
             container.appendChild(div);
 
-            // Základní vykreslení tras (bílá s okrajem)
             L.geoJSON(r.geometry, { style: { color: '#000', weight: 7, opacity: 0.15 } }).addTo(routeLayers);
             const ghost = L.geoJSON(r.geometry, { 
                 style: { color: '#fff', weight: 5, opacity: 1, cursor: 'pointer' } 
@@ -188,14 +185,12 @@
             groupBounds.extend(ghost.getBounds());
             ghost.on('click', () => activateRoute(r, div));
 
-            // Uložíme si referenci na preferred trasu pro automatický start
             if (r.preferred) {
                 preferredRoute = r;
                 preferredElement = div;
             }
         });
 
-        // Logika automatického zobrazení preferred trasy
         if (preferredRoute) {
             activateRoute(preferredRoute, preferredElement);
         } else {
@@ -211,33 +206,37 @@
 
     function showRouteOnMap(r) {
         highlightLayer.clearLayers();
+        const box = document.getElementById('route-info-box');
+        
+        // Reset animace při překliku
+        box.classList.remove('visible');
 
         const activeLayer = L.geoJSON(r.geometry, { 
             style: { color: '#003399', weight: 8, opacity: 1, lineJoin: 'round' } 
         }).addTo(highlightLayer);
 
-        document.getElementById('info-title').innerText = r.name;
-        document.getElementById('info-dist').innerText = r.distance;
-        document.getElementById('info-price').innerText = r.price || '---';
-        
-        if (r.note) {
-            document.getElementById('info-note').innerText = r.note;
-            document.getElementById('info-note-container').style.display = 'block';
-        } else {
-            document.getElementById('info-note-container').style.display = 'none';
-        }
+        setTimeout(() => {
+            document.getElementById('info-title').innerText = r.name;
+            document.getElementById('info-dist').innerText = r.distance;
+            document.getElementById('info-price').innerText = r.price || '---';
+            
+            if (r.note) {
+                document.getElementById('info-note').innerText = r.note;
+                document.getElementById('info-note-container').style.display = 'block';
+            } else {
+                document.getElementById('info-note-container').style.display = 'none';
+            }
+            box.classList.add('visible');
+        }, 50);
 
-        document.getElementById('route-info-box').style.display = 'block';
         map.flyToBounds(activeLayer.getBounds(), { padding: [100, 100], duration: 1 });
     }
 
     function closeInfoBox() {
-        document.getElementById('route-info-box').style.display = 'none';
+        document.getElementById('route-info-box').classList.remove('visible');
         highlightLayer.clearLayers();
         document.querySelectorAll('.route-item').forEach(el => el.classList.remove('active'));
     }
 </script>
 </body>
 </html>
-
-
