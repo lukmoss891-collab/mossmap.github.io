@@ -31,7 +31,6 @@
         .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #cbd5e1; }
         .dot-green { background: #22c55e; }
 
-        /* VYLEPŠENÝ INFO BOX S ANIMACÍ */
         #route-info-box {
             position: absolute; top: 20px; right: 20px; width: 300px; background: white; z-index: 2000;
             border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); border: 1px solid var(--border);
@@ -114,7 +113,7 @@
 
     async function initData() {
         try {
-            const response = await fetch('database.json');
+            const response = await fetch('routes.json');
             if (!response.ok) throw new Error();
             allRoutes = await response.json();
             document.getElementById('dot-db').classList.add('dot-green');
@@ -153,7 +152,12 @@
             const deptShape = franceBorders.features.find(f => f.properties.code === deptInput || f.properties.code === deptClean);
             if (deptShape) {
                 L.geoJSON(deptShape, {
-                    style: { color: '#1d4ed8', weight: 2, fillOpacity: 0.04, dashArray: '5, 5' }
+                    style: { 
+                        color: '#1d4ed8', 
+                        weight: 4, 
+                        fillColor: '#ffffff',
+                        fillOpacity: 0.3 
+                    }
                 }).addTo(borderLayer);
             }
         }
@@ -208,7 +212,6 @@
         highlightLayer.clearLayers();
         const box = document.getElementById('route-info-box');
         
-        // Reset animace při překliku
         box.classList.remove('visible');
 
         const activeLayer = L.geoJSON(r.geometry, { 
