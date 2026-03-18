@@ -3,20 +3,50 @@
     "CZ": {
       "country_name": "Česká republika",
       "toll_regex": "^(D|I|R|PR)?\\d{1,2}$",
-      "rate_per_km": 5.96,
-      "notes": "Dálnice a silnice I. třídy."
+      "rate_per_km": 0.24,
+      "notes": "Dálnice a silnice I. třídy (průměr CZK/25.35)."
     },
     "DE": {
       "country_name": "Německo",
       "toll_regex": "^(A|B)\\d+",
-      "rate_per_km": 0.34,
-      "notes": "Dálnice a spolkové silnice."
+      "rate_per_km": 0.348,
+      "notes": "Dálnice (Autobahn) a spolkové silnice (Bundesstraßen)."
     },
-    "FR": {
-      "country_name": "Francie",
+    "AT": {
+      "country_name": "Rakousko",
+      "toll_regex": "^(A|S)\\d+",
+      "rate_per_km": 0.5724,
+      "notes": "Dálnice (A) a rychlostní silnice (S) přes GO-Maut."
+    },
+    "IT": {
+      "country_name": "Itálie",
       "toll_regex": "^A\\d+",
-      "rate_per_km": 0.22,
-      "notes": "Pouze dálnice A."
+      "rate_per_km": 0.18,
+      "notes": "Dálnice (Autostrade). Silnice typu SS jsou obvykle zdarma."
+    },
+    "BE": {
+      "country_name": "Belgie",
+      "toll_regex": "^(A|E|N|R)\\d+",
+      "rate_per_km": 0.212,
+      "notes": "Všechny hlavní tahy podléhající systému Viapass."
+    },
+    "PL": {
+      "country_name": "Polsko",
+      "toll_regex": "^(A|S)\\d+",
+      "rate_per_km": 0.13,
+      "notes": "Dálnice (A) a rychlostní silnice (S) v systému e-TOLL."
+    },
+    "HU": {
+      "country_name": "Maďarsko",
+      "toll_regex": "^M\\d+",
+      "rate_per_km": 0.51,
+      "notes": "Dálnice a rychlostní komunikace systému HU-GO."
+    },
+    "SI": {
+      "country_name": "Slovinsko",
+      "toll_regex": "^(A|H)\\d+",
+      "rate_per_km": 0.28,
+      "notes": "Dálnice (A) a rychlostní silnice (H) pro vozidla nad 3.5t."
     }
   }
 }
