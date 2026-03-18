@@ -3,7 +3,7 @@
     "CZ": {
       "country_name": "Česká republika",
       "toll_regex": "^(D|I|R|PR)?\\d{1,2}$",
-      "rate_per_km": 5.96,
+      "rate_per_km": 105.96,
       "notes": "Dálnice a silnice I. třídy."
     },
     "DE": {
