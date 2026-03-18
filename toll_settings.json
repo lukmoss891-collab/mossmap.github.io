@@ -9,7 +9,7 @@
     "DE": {
       "country_name": "Německo",
       "toll_regex": "^(A|B)\\d+",
-      "rate_per_km": 0.348,
+      "rate_per_km": 0.34,
       "notes": "Dálnice a spolkové silnice."
     },
     "FR": {
