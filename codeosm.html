@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8" />
+    <title>Route Master - PRO Editor (TomTom Truck Logic)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --accent: #1d4ed8; --accent-light: #60a5fa; --success: #059669; --danger: #dc2626; --dark: #0f172a; --border: #e2e8f0; --bg: #f8fafc; --gold: #f59e0b; --gray-wp: #94a3b8; }
+        body { margin: 0; font-family: 'IBM Plex Sans', sans-serif; display: flex; height: 100vh; overflow: hidden; background: var(--bg); }
+        
+        #panel { width: 420px; border-right: 1px solid var(--border); background: white; display: flex; flex-direction: column; z-index: 1000; box-shadow: 4px 0 15px rgba(0,0,0,0.05); }
+        .tab-nav { background: var(--dark); padding: 15px; color: white; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 1px; }
+        .tab-content { display: flex; flex-direction: column; flex-grow: 1; overflow-y: auto; }
+        .section { padding: 20px; border-bottom: 1px solid var(--border); }
+        
+        h1 { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 15px 0; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; }
+        h1::before { content: ''; width: 3px; height: 12px; background: var(--accent); border-radius: 2px; }
+
+        #map-view-controls {
+            position: absolute; top: 20px; left: 20px; z-index: 1000;
+            display: flex; gap: 12px; pointer-events: auto;
+        }
+        .view-card {
+            background: white; border: 2px solid white; border-radius: 14px; padding: 12px;
+            width: 125px; cursor: pointer; transition: 0.2s; box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+        }
+        .view-card.active { border-color: var(--accent); background: #eff6ff; transform: translateY(-2px); }
+        .view-card span { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+        .view-card.active span { color: var(--accent); }
+        .view-card svg { width: 100%; height: 50px; border-radius: 6px; }
+
+        #waypoint-container { display: flex; flex-direction: column; gap: 0; margin-bottom: 8px; }
+
+        @keyframes wpSlideIn { from { opacity: 0; transform: translateY(-10px); max-height: 0; margin-bottom: 0; } to { opacity: 1; transform: translateY(0); max-height: 100px; margin-bottom: 8px; } }
+        @keyframes wpSlideOut { from { opacity: 1; transform: translateY(0); max-height: 100px; margin-bottom: 8px; } to { opacity: 0; transform: translateY(-10px); max-height: 0; margin-bottom: 0; } }
+
+        .wp-row-wrapper { display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; overflow: hidden; margin-bottom: 8px; }
+        .wp-row-wrapper.new-spawn { animation: wpSlideIn 0.25s ease forwards; }
+        .wp-row-wrapper.removing { animation: wpSlideOut 0.25s ease forwards; }
+
+        .wp-row { display: flex; gap: 8px; flex: 1; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 6px; position: relative; transition: border-color 0.2s; }
+        .wp-row.drag-over { border: 2px dashed var(--accent); background: #eff6ff; }
+        .wp-row input { flex: 1; border: none; padding: 6px; outline: none; font-size: 12px; min-width: 0; background: transparent; }
+        
+        .drag-handle { color: #94a3b8; padding: 0 4px; font-size: 14px; user-select: none; cursor: grab; }
+        .drag-handle:active { cursor: grabbing; }
+        
+        .wp-badge { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+        .wp-badge.start { background: var(--accent); }
+        .wp-badge.mid { background: var(--gray-wp); }
+        .wp-badge.end { background: var(--success); }
+
+        .btn-map-select { background: #f1f5f9; border: none; border-radius: 4px; padding: 6px; cursor: pointer; filter: grayscale(1); transition: 0.2s; }
+        .btn-map-select.active { background: var(--accent); filter: grayscale(0); transform: scale(1.1); }
+        
+        .loader-mini { width: 12px; height: 12px; border: 2px solid #e2e8f0; border-top: 2px solid var(--accent); border-radius: 50%; display: none; animation: spin 0.8s linear infinite; position: absolute; right: 85px; top: 14px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .btn { width: 100%; padding: 12px; cursor: pointer; border-radius: 8px; border: none; font-weight: 600; font-size: 13px; transition: 0.2s; margin-bottom: 8px; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-secondary { background: #f1f5f9; color: #1e293b; border: 1px solid var(--border); }
+
+        #map-container { position: relative; flex-grow: 1; }
+        #map { height: 100%; width: 100%; z-index: 1; background: #aad3df; }
+        #map.map-selecting { cursor: crosshair !important; }
+
+        #route-info { position: absolute; top: 20px; right: 20px; z-index: 1000; background: white; padding: 20px 25px; border-radius: 12px; box-shadow: 0 4px 25px rgba(0,0,0,0.15); border: 1px solid var(--border); display: none; animation: slideIn 0.3s ease-out; width: 340px; word-wrap: break-word; overflow-wrap: break-word; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .wp-number-icon { background: var(--accent); color: white; border: 2px solid white; border-radius: 50%; display: flex !important; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); cursor: move; box-sizing: border-box; width: 24px !important; height: 24px !important; position: absolute; }
+        .wp-number-icon.start { background: var(--accent); }
+        .wp-number-icon.mid { background: var(--gray-wp); }
+        .wp-number-icon.end { background: var(--success); }
+
+        .road-label { 
+            background: #ffffff; border: 0px solid #1e293b; border-radius: 4px; padding: 2px 6px; 
+            font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; white-space: nowrap; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2); pointer-events: none; display: inline-flex; 
+            align-items: center; justify-content: center; line-height: 1; color: #0f172a;
+            margin-bottom: 30px; 
+        }
+        .toll-label { 
+            background: #0398fc; border: 0px solid white; border-radius: 4px; padding: 4px 6px; 
+            font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 800; color: white; 
+            white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.2); pointer-events: none; 
+            display: inline-flex; align-items: center; justify-content: center; line-height: 1;
+        }
+
+        #editor-modal, #screenshot-selector-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 2000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(2px); }
+        .modal-box { background: white; width: 340px; padding: 25px; border-radius: 12px; }
+        #loader { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--dark); color: white; padding: 8px 20px; border-radius: 30px; font-size: 12px; display: none; z-index: 10000; }
+        
+        .route-item { padding: 12px 60px 12px 20px; border-bottom: 1px solid var(--border); position: relative; cursor: pointer; transition: background 0.2s; }
+        .route-item:hover { background: #f8fafc; }
+        .btn-mini { padding: 4px 8px; font-size: 10px; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; font-weight: 600; }
+        .star-toggle { position: absolute; top: 0; right: 0; bottom: 0; width: 60px; display: flex; align-items: center; justify-content: center; font-size: 26px; cursor: pointer; color: #cbd5e1; transition: 0.2s; user-select: none; }
+        .star-toggle.active { color: var(--gold); }
+
+        .flag-input-group { position: relative; flex: 1; }
+        .flag-input-group input { width: 100%; padding: 8px 8px 8px 34px !important; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; font-size: 13px; }
+        .flag-img { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 18px; height: auto; border: 1px solid #eee; box-shadow: 0 1px 2px rgba(0,0,0,0.05); pointer-events: none; }
+
+        #filter-section { padding: 15px 20px; background: #fff; border-top: 1px solid var(--border); }
+        .filter-input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; box-sizing: border-box; outline: none; }
+        .filter-input:focus { border-color: var(--accent); }
+
+        .remove-wp-btn { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: none; border: none; color: var(--danger); cursor: pointer; font-size: 16px; flex-shrink: 0; }
+        .placeholder-wp-btn { width: 24px; flex-shrink: 0; }
+
+        .itinerary-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #334155; }
+        .itinerary-row { border-bottom: 1px dashed #e2e8f0; padding: 4px 0; display: flex; flex-direction: column; gap: 2px; }
+        .itinerary-row:last-child { border-bottom: none; }
+        .itinerary-label { font-weight: 800; color: var(--dark); margin-right: 5px; }
+        .itinerary-cross { color: var(--accent); font-weight: 800; display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+
+        #variant-container { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+        .variant-card { border: 1px solid var(--border); border-radius: 12px; padding: 15px; background: #fff; cursor: pointer; transition: 0.2s; position: relative; }
+        .variant-card:hover { border-color: var(--accent-light); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .variant-card.active { border-color: var(--accent); border-width: 2px; background: #f0f7ff; }
+        .variant-title { font-size: 12px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 8px; }
+        .variant-flags { display: flex; align-items: center; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+        .variant-flag-mini { width: 16px; height: 11px; object-fit: cover; border: 1px solid #e2e8f0; }
+        .variant-arrow { font-size: 10px; color: #cbd5e1; }
+        .variant-stats { display: flex; justify-content: space-between; align-items: baseline; }
+        .variant-time { font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 700; color: var(--dark); }
+        .variant-dist { font-size: 12px; color: #94a3b8; }
+        .variant-price { font-size: 13px; font-weight: 800; color: var(--success); text-align: right; }
+
+        .btn-camera {
+            background: white; border: 2px solid white; border-radius: 14px; width: 50px; height: 78px;
+            cursor: pointer; transition: 0.2s; box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+        }
+        .btn-camera:hover { transform: translateY(-2px); border-color: var(--accent); }
+        .btn-camera span { font-size: 8px; font-weight: 800; color: #64748b; text-transform: uppercase; }
+
+        #screenshot-table-overlay {
+            position: absolute; bottom: 20px; right: 20px; background: white;
+            border: 2px solid var(--dark); border-radius: 8px; padding: 15px;
+            width: 250px; z-index: 500; font-family: 'IBM Plex Mono', monospace;
+            display: none;
+        }
+
+        #country-screenshot-list {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            max-height: 250px;
+            overflow-y: auto;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed var(--border);
+        }
+        .btn-country-select {
+            padding: 12px !important; 
+            font-size: 13px !important; 
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-country-select:hover { background: #f8fafc; border-color: var(--accent); }
+
+        .calc-input-row { display: flex; gap: 8px; margin-bottom: 12px; }
+        .calc-field { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .calc-field label { font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; }
+        .calc-field input { padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; outline: none; width: 100%; box-sizing: border-box; }
+        .calc-field input:focus { border-color: var(--accent); }
+    </style>
+</head>
+<body>
+
+<div id="loader">Počítám trasu...</div>
+
+<div id="screenshot-selector-modal">
+    <div class="modal-box" style="width: 380px;">
+        <h1 style="justify-content: center;">Možnosti snímku</h1>
+        <p style="font-size: 12px; color: #64748b; text-align: center; margin-bottom: 20px;">Vyberte výřez mapy pro fotografii:</p>
+        
+        <button class="btn btn-primary" style="padding: 14px; font-size: 14px;" onclick="proceedWithScreenshot('all')">Celá trasa</button>
+        
+        <div id="country-screenshot-list"></div>
+        
+        <button class="btn btn-secondary" style="margin-top: 15px;" onclick="document.getElementById('screenshot-selector-modal').style.display='none'">Zrušit</button>
+    </div>
+</div>
+
+<div id="editor-modal">
+    <div class="modal-box">
+        <h1>Detaily trasy</h1>
+        <input type="hidden" id="edit-id">
+        <input type="text" id="edit-name" placeholder="Název" style="width:100%; padding:8px; margin-bottom:10px; border:1px solid var(--border); border-radius:4px; box-sizing: border-box;">
+        
+        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+            <div class="flag-input-group">
+                <img src="https://flagcdn.com/w40/de.png" class="flag-img" alt="DE">
+                <input type="number" id="edit-toll-de" placeholder="DE (€)" step="0.01">
+            </div>
+            <div class="flag-input-group">
+                <img src="https://flagcdn.com/w40/fr.png" class="flag-img" alt="FR">
+                <input type="number" id="edit-toll-fr" placeholder="FR (€)" step="0.01">
+            </div>
+        </div>
+
+        <textarea id="edit-note" rows="3" placeholder="Poznámka" style="width:100%; padding:8px; margin-bottom:10px; border:1px solid var(--border); border-radius:4px; width:100%; box-sizing: border-box;"></textarea>
+        <div style="display:flex; gap: 8px;">
+            <button class="btn btn-secondary" onclick="closeEditor()">Zpět</button>
+            <button class="btn btn-primary" onclick="saveEdit()">Uložit</button>
+        </div>
+    </div>
+</div>
+
+<div id="panel">
+    <div class="tab-nav">ADMINISTRACE (v2026.5 - TomTom Engine)</div>
+    <div class="tab-content">
+        <div class="section">
+            <h1>Trasové body</h1>
+            <div id="waypoint-container"></div>
+            <button class="btn-secondary" style="font-size: 11px; padding: 5px; margin-bottom:12px; width: auto;" onclick="addWaypoint()">+ Zastávka</button>
+            <button class="btn btn-primary" onclick="calculateDraft()">GENEROVAT TRASU</button>
+            
+            <div id="variant-container"></div>
+
+            <div id="save-section" style="display:none; margin-top:20px; padding-top:15px; border-top: 1px dashed var(--border)">
+                <input type="text" id="targetDept" placeholder="Číslo departmentu" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; margin-bottom:8px; box-sizing:border-box;">
+                <button class="btn btn-success" onclick="archiveDraft()">ULOŽIT DO ARCHIVU</button>
+            </div>
+        </div>
+        <div id="full-route-list" style="flex-grow:1; overflow-y:auto;"></div>
+        <div id="filter-section">
+            <input type="text" id="deptFilter" class="filter-input" placeholder="🔍 Filtrovat dle departmentu..." oninput="refreshUI()">
+        </div>
+    </div>
+</div>
+
+<div id="map-container">
+    <div id="map-view-controls">
+        <div id="card-clean" class="view-card" onclick="setViewMode('clean')">
+            <span>Čistá</span>
+            <svg viewBox="0 0 100 50">
+                <path d="M10 25 L90 25" stroke="#e2e8f0" stroke-width="6" fill="none" stroke-linecap="round"/>
+                <path d="M10 25 C 30 10, 70 40, 90 25" stroke="#1d4ed8" stroke-width="4" fill="none" stroke-linecap="round" />
+                <circle cx="10" cy="25" r="4" fill="#1d4ed8" stroke="white" stroke-width="1.5"/>
+                <circle cx="90" cy="25" r="4" fill="#059669" stroke="white" stroke-width="1.5"/>
+            </svg>
+        </div>
+        <div id="card-seg" class="view-card" onclick="setViewMode('seg')">
+            <span>Segmenty</span>
+            <svg viewBox="0 0 100 60">
+                <path d="M10 40 L90 40" stroke="#e2e8f0" stroke-width="6" fill="none" stroke-linecap="round"/>
+                <path d="M10 40 C 25 30, 35 30, 50 40" stroke="#1d4ed8" stroke-width="4" fill="none" stroke-linecap="round" />
+                <rect x="22" y="8" width="18" height="12" rx="3" fill="white" stroke="#1e293b" stroke-width="1"/>
+                <text x="31" y="17" font-family="IBM Plex Mono" font-size="7" text-anchor="middle" font-weight="bold" fill="#0f172a">D1</text>
+                <path d="M50 40 C 65 50, 75 50, 90 40" stroke="#1d4ed8" stroke-width="4" fill="none" stroke-linecap="round" />
+                <rect x="62" y="18" width="18" height="12" rx="3" fill="white" stroke="#1e293b" stroke-width="1"/>
+                <text x="71" y="27" font-family="IBM Plex Mono" font-size="7" text-anchor="middle" font-weight="bold" fill="#0f172a">E50</text>
+                <circle cx="10" cy="40" r="4" fill="#1d4ed8" stroke="white" stroke-width="1.5"/>
+                <circle cx="50" cy="40" r="3" fill="#94a3b8" stroke="white" stroke-width="1.5"/>
+                <circle cx="90" cy="40" r="4" fill="#059669" stroke="white" stroke-width="1.5"/>
+            </svg>
+        </div>
+        <button class="btn-camera" onclick="takeScreenshot()">
+            <span style="font-size: 20px;">📷</span>
+            <span>Foto</span>
+        </button>
+    </div>
+    <div id="route-info"></div>
+    <div id="map"></div>
+    <div id="screenshot-table-overlay"></div>
+</div>
+
+<script>
+    const TOMTOM_API_KEY = 'mo0CX1ovhJrqn5cYyCCunEPIHxU3rNlf';
+    const CZK_RATE = 24.46;
+    let KM_RATE = 23; 
+    const GEOJSON_URL = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_0_countries.geojson';
+    
+    const EUROPE_ISO_SET = "AL,AD,AT,BY,BE,BA,BG,HR,CY,CZ,DK,EE,FI,FR,DE,GR,HU,IS,IE,IT,LV,LI,LT,LU,MT,MD,MC,ME,NL,MK,NO,PL,PT,RO,SM,RS,SK,SI,ES,SE,CH,UA,GB,VA";
+
+    const TOLL_RATES = {
+        "CZE_HWY": 5.9644, "CZE_1ST": 3.6509, "DEU": 0.348, "AUT": 0.5724, "ITA": 0.18, 
+        "BEL": 0.212, "POL": 0.13, "HUN": 0.51, "SVN": 0.28, "FRA": 0.33, "ESP": 0.19, "SVK": 0.2677
+    };
+
+    const LDM_COEFFICIENTS = {
+        1: 0.17, 2: 0.25, 3: 0.33, 4: 0.41, 5: 0.55, 6: 0.61, 7: 0.65, 8: 0.72, 9: 0.78, 10: 0.85,
+        11: 0.89, 12: 0.94, 13: 1
+    };
+
+    const FR_SPECIFIC_TOLLS = { "A4": 0.305, "A10": 0.335, "A11": 0.375, "A19": 0.6, "A320": 0, "A79": 0.27, "A35": 0, "A714": 0 };
+    const CZ_TOLL_ROADS = ["I/3","I/4","I/6","I/7","I/11","I/12","I/16","I/19","I/20","I/22","I/26","I/27","I/30","I/33","I/34","I/35","I/37","I/38","I/43","I/46","I/47","I/48","I/50","I/52","I/55","I/58","I/63","I/68"];
+    const ISO_MAP = { "DEU":"DE", "FRA":"FR", "AUT":"AT", "ITA":"IT", "BEL":"BE", "POL":"PL", "HUN":"HU", "SVN":"SI", "ESP":"ES", "SVK":"SK", "CZE":"CZ" };
+    const FLAG_ISO_MAP = { "DEU":"de", "FRA":"fr", "AUT":"at", "ITA":"it", "BEL":"be", "POL":"pl", "HUN":"hu", "SVN":"si", "ESP":"es", "SVK":"sk", "CZE":"cz" };
+
+    let waypoints = [{ id: 1, val: '', latlng: null, lastSelected: '', isLocked: false }, { id: 2, val: '', latlng: null, lastSelected: '', isLocked: false }];
+    let savedRoutes = JSON.parse(localStorage.getItem('route_db')) || [];
+    let worldGeoJSON = null;
+    let draftRoutes = [];
+    let activeRouteIndex = 0;
+    let draftRoute = null;
+    let tomTomGuidance = null;
+    let activeSelectionWp = null;
+    let autocompleteTimeout = null;
+    let draggedItemIndex = null;
+    let viewMode = localStorage.getItem('route_view_mode') || 'clean'; 
+
+    const map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([49.5, 12], 6);
+   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap contributors',
+    crossOrigin: true
+}).addTo(map);
+    let boundaryLayer = L.layerGroup().addTo(map);
+    let draftLayer = L.layerGroup().addTo(map);
+    let markerLayer = L.layerGroup().addTo(map);
+
+    function formatTomTomTime(seconds) {
+        const d = Math.floor(seconds / (3600 * 24));
+        const h = Math.floor((seconds % (3600 * 24)) / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        let res = "";
+        if (d > 0) res += d + "d ";
+        if (h > 0 || d > 0) res += h + "h ";
+        res += m + "m";
+        return res;
+    }
+
+    function setViewMode(mode) {
+        viewMode = mode;
+        localStorage.setItem('route_view_mode', mode);
+        updateViewControlUI();
+        if (draftRoute) renderDraftOnMap();
+    }
+
+    function updateViewControlUI() {
+        document.getElementById('card-clean').classList.toggle('active', viewMode === 'clean');
+        document.getElementById('card-seg').classList.toggle('active', viewMode === 'seg');
+    }
+    updateViewControlUI();
+
+    function encodePolyline(coords) { let encode = (v) => { v = v < 0 ? ~(v << 1) : v << 1; let s = ''; while (v >= 0x20) { s += String.fromCharCode((0x20 | (0x1f & v)) + 63); v >>= 5; } s += String.fromCharCode(v + 63); return s; }; let lastLat = 0, lastLng = 0, result = ''; coords.forEach(c => { let lat = Math.round(c[1] * 1e5), lng = Math.round(c[0] * 1e5); result += encode(lat - lastLat) + encode(lng - lastLng); lastLat = lat; lastLng = lng; }); return result; }
+    function decodePolyline(str) { let index = 0, lat = 0, lng = 0, coords = [], shift, result, byte; while (index < str.length) { shift = 0; result = 0; do { byte = str.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20); lat += ((result & 1) ? ~(result >> 1) : (result >> 1)); shift = 0; result = 0; do { byte = str.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20); lng += ((result & 1) ? ~(result >> 1) : (result >> 1)); coords.push([lng / 1e5, lat / 1e5]); } return coords; }
+
+    async function loadBoundaries() {
+        toggleLoader(true, "Načítám HD mapové podklady...");
+        try {
+            const res = await fetch(GEOJSON_URL);
+            worldGeoJSON = await res.json();
+            L.geoJSON(worldGeoJSON, { style: { color: '#1d47f0', weight: 1, opacity: 1, fillColor: 'transparent', interactive: false } }).addTo(boundaryLayer);
+        } catch (e) { console.error(e); }
+        toggleLoader(false);
+    }
+
+    function getCountryByLatLng(lng, lat) {
+        if (!worldGeoJSON) return null;
+        const pt = turf.point([lng, lat]);
+        for (let feature of worldGeoJSON.features) {
+            if (turf.booleanPointInPolygon(pt, feature)) {
+                let code = feature.properties.ISO_A3 || feature.properties.iso_a3;
+                if (!code || code === "-99") {
+                    const name = (feature.properties.NAME || "").toUpperCase();
+                    if (name.includes("FRANCE")) return "FRA";
+                    if (name.includes("GERMANY")) return "DEU";
+                    if (name.includes("CZECH")) return "CZE";
+                }
+                return code;
+            }
+        }
+        return null;
+    }
+
+    function getShortRoadName(roadNumbers, segmentCoords) {
+        if (!roadNumbers || roadNumbers.length === 0) return "";
+        let startCountry = getCountryByLatLng(segmentCoords[0][0], segmentCoords[0][1]);
+        let endCountry = getCountryByLatLng(segmentCoords[segmentCoords.length-1][0], segmentCoords[segmentCoords.length-1][1]);
+        if (startCountry !== endCountry) {
+            const eRoad = roadNumbers.find(n => n.toUpperCase().startsWith('E'));
+            if (eRoad) return eRoad.toUpperCase();
+        }
+        const nationalRoad = roadNumbers.find(n => !n.toUpperCase().startsWith('E'));
+        if (nationalRoad) return nationalRoad.replace(/\s+/g, '').toUpperCase();
+        return roadNumbers[0].replace(/\s+/g, '').toUpperCase();
+    }
+
+    function renderWaypoints() {
+        const container = document.getElementById('waypoint-container');
+        container.innerHTML = '';
+        waypoints.forEach((wp, index) => container.appendChild(createWaypointRow(wp, index)));
+    }
+
+    function createWaypointRow(wp, index) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'wp-row-wrapper';
+        wrapper.id = `wp-wrapper-${wp.id}`;
+        
+        const div = document.createElement('div');
+        div.className = 'wp-row';
+        div.id = `wp-row-${wp.id}`;
+        
+        let bCls = index === 0 ? "start" : (index === waypoints.length - 1 ? "end" : "mid");
+        div.innerHTML = `
+            <div class="drag-handle" 
+                 onmouseenter="document.getElementById('wp-row-${wp.id}').draggable = true" 
+                 onmouseleave="document.getElementById('wp-row-${wp.id}').draggable = false">☰</div>
+            <div class="wp-badge ${bCls}">${index + 1}</div>
+            <input type="text" id="inp-${wp.id}" list="list-${wp.id}" value="${wp.val}" placeholder="Bod ${index + 1}" autocomplete="off">
+            <div class="loader-mini" id="load-${wp.id}"></div>
+            <datalist id="list-${wp.id}"></datalist>
+            <button class="btn-map-select ${activeSelectionWp === wp.id ? 'active' : ''}" onclick="toggleMapSelection(${wp.id})">📍</button>
+            <button onclick="handleWpAction(${index})" style="background:none; border:none; color:#94a3b8; cursor:pointer;" title="Vymazat text">✕</button>
+        `;
+        
+        const isMiddle = (index !== 0 && index !== waypoints.length - 1);
+        const actionBtnHtml = isMiddle ? `<button class="remove-wp-btn" onclick="removeWp(${index})" title="Odstranit zastávku">🗑️</button>` : `<div class="placeholder-wp-btn"></div>`;
+        wrapper.appendChild(div);
+        wrapper.insertAdjacentHTML('beforeend', actionBtnHtml);
+        
+        const inp = div.querySelector('input');
+        inp.addEventListener('input', e => { 
+            const wpRef = waypoints.find(w => w.id === wp.id);
+            const spinner = document.getElementById(`load-${wp.id}`);
+
+            const list = document.getElementById(`list-${wp.id}`);
+            const selectedOpt = Array.from(list.options).find(o => o.value === e.target.value);
+            
+            if (selectedOpt) {
+                wpRef.latlng = { 
+                    lat: parseFloat(selectedOpt.getAttribute('data-lat')), 
+                    lng: parseFloat(selectedOpt.getAttribute('data-lng')) 
+                };
+                wpRef.val = e.target.value;
+                wpRef.lastSelected = e.target.value;
+                wpRef.isLocked = true;
+                if(spinner) spinner.style.display = 'none';
+                renderMarkers(); 
+                return;
+            }
+
+            if (e.inputType === "insertReplacementText" || e.inputType === "insertFromPaste") {
+                wpRef.isLocked = true; wpRef.val = e.target.value; wpRef.lastSelected = e.target.value;
+                if(spinner) spinner.style.display = 'none'; return;
+            }
+            wpRef.isLocked = false; const newVal = e.target.value;
+            if (newVal === wpRef.lastSelected && newVal !== "") { if(spinner) spinner.style.display = 'none'; return; }
+            wpRef.val = newVal; wpRef.latlng = null; handleAutocomplete(e.target, wp.id); 
+        });
+        inp.addEventListener('change', e => {
+            const wpRef = waypoints.find(w => w.id === wp.id);
+            wpRef.lastSelected = e.target.value; wpRef.isLocked = true;
+            const spinner = document.getElementById(`load-${wp.id}`);
+            if(spinner) spinner.style.display = 'none';
+        });
+
+        div.addEventListener('dragstart', e => { draggedItemIndex = index; div.style.opacity = '0.4'; });
+        div.addEventListener('dragend', () => { div.style.opacity = '1'; div.draggable = false; });
+        div.addEventListener('dragover', e => { e.preventDefault(); div.classList.add('drag-over'); });
+        div.addEventListener('dragleave', () => div.classList.remove('drag-over'));
+        div.addEventListener('drop', e => {
+            e.stopPropagation(); div.classList.remove('drag-over');
+            if (draggedItemIndex !== null && draggedItemIndex !== index) {
+                const item = waypoints.splice(draggedItemIndex, 1)[0];
+                waypoints.splice(index, 0, item); renderWaypoints(); renderMarkers();
+                draggedItemIndex = null;
+            }
+        });
+        return wrapper;
+    }
+
+    function handleWpAction(index) {
+        const wp = waypoints[index]; wp.val = ""; wp.latlng = null; wp.lastSelected = ""; wp.isLocked = false;
+        renderWaypoints(); renderMarkers();
+    }
+
+   async function handleAutocomplete(input, wpId) {
+        const wpRef = waypoints.find(w => w.id === wpId);
+        const spinner = document.getElementById(`load-${wpId}`); 
+        if (wpRef.isLocked || input.value.length < 3) { if(spinner) spinner.style.display = 'none'; return; }
+        clearTimeout(autocompleteTimeout);
+        autocompleteTimeout = setTimeout(async () => {
+            if (wpRef.isLocked) { if(spinner) spinner.style.display = 'none'; return; }
+            if(spinner) spinner.style.display = 'block';
+            try {
+                const res = await fetch(`https://api.tomtom.com/search/2/search/${encodeURIComponent(input.value)}.json?key=${TOMTOM_API_KEY}&limit=10&language=cs-CZ&typeahead=true&countrySet=${EUROPE_ISO_SET}&entityType=Municipality,Settlement,PostalCodeArea`);
+                const data = await res.json();
+                const list = document.getElementById(`list-${wpId}`);
+                if (list && data.results) { 
+                    list.innerHTML = ''; 
+                    data.results.forEach(item => { 
+                        const opt = document.createElement('option'); 
+                        let fullAddress = item.address.freeformAddress;
+                        if (item.address.country) fullAddress += `, ${item.address.country}`;
+                        opt.value = fullAddress;
+                        opt.setAttribute('data-lat', item.position.lat);
+                        opt.setAttribute('data-lng', item.position.lon);
+                        list.appendChild(opt); 
+                    }); 
+                }
+            } catch (e) { console.error(e); } finally { if(spinner) spinner.style.display = 'none'; }
+        }, 400);
+    }
+
+    function toggleMapSelection(wpId) { activeSelectionWp = (activeSelectionWp === wpId) ? null : wpId; document.getElementById('map').classList.toggle('map-selecting', activeSelectionWp !== null); renderWaypoints(); }
+    
+    map.on('click', async e => {
+        if (activeSelectionWp === null) return;
+        const currentWpId = activeSelectionWp;
+        const wpIndex = waypoints.findIndex(w => w.id === currentWpId);
+        if (wpIndex !== -1) {
+            const wp = waypoints[wpIndex]; wp.latlng = e.latlng; wp.val = "Načítám adresu...";
+            activeSelectionWp = null; document.getElementById('map').classList.remove('map-selecting');
+            renderWaypoints(); renderMarkers(); 
+            await updateWaypointFromLatLng(wp, e.latlng);
+            renderWaypoints(); renderMarkers(); calculateDraft();
+        }
+    });
+
+    async function updateWaypointFromLatLng(wp, latlng) {
+        try {
+            const res = await fetch(`https://api.tomtom.com/search/2/reverseGeocode/${latlng.lat},${latlng.lng}.json?key=${TOMTOM_API_KEY}&language=cs-CZ`);
+            const data = await res.json(); 
+            if (data.addresses && data.addresses[0]) {
+                wp.val = data.addresses[0].address.freeformAddress;
+                wp.lastSelected = wp.val; wp.latlng = latlng; wp.isLocked = true;
+            }
+        } catch (err) { 
+            wp.val = `${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`; 
+            wp.lastSelected = wp.val; wp.latlng = latlng; wp.isLocked = true;
+        }
+    }
+
+    function renderMarkers() {
+        markerLayer.clearLayers();
+        waypoints.forEach((wp, idx) => { 
+            if(wp.latlng) { 
+                let mCls = idx === 0 ? "start" : (idx === waypoints.length - 1 ? "end" : "mid");
+                const m = L.marker([wp.latlng.lat, wp.latlng.lng], { 
+                    icon: L.divIcon({ className: `wp-number-icon ${mCls}`, html: `<span>${idx+1}</span>`, iconSize: [24, 24], iconAnchor: [12, 12] }), 
+                    draggable: true 
+                }).addTo(markerLayer);
+                m.on('dragend', async e => { await updateWaypointFromLatLng(waypoints[idx], e.target.getLatLng()); renderWaypoints(); renderMarkers(); calculateDraft(); });
+            } 
+        });
+    }
+
+    async function calculateDraft() {
+        toggleLoader(true, "Probíhá kalkulace trasy...");
+        const points = [];
+        for (let wp of waypoints) {
+            if (wp.latlng) {
+                points.push(`${wp.latlng.lng},${wp.latlng.lat}`);
+            } else if (wp.val && wp.val.length > 2 && wp.val !== "Načítám adresu...") {
+                const res = await fetch(`https://api.tomtom.com/search/2/geocode/${encodeURIComponent(wp.val)}.json?key=${TOMTOM_API_KEY}&limit=1&countrySet=${EUROPE_ISO_SET}&entityType=Municipality,Settlement`);
+                const d = await res.json(); 
+                if (d.results && d.results[0]) { 
+                    wp.latlng = { lat: d.results[0].position.lat, lng: d.results[0].position.lon }; 
+                    wp.lastSelected = wp.val; 
+                    points.push(`${d.results[0].position.lon},${d.results[0].position.lat}`); 
+                }
+            }
+        }
+
+        if (points.length < 2) { renderMarkers(); toggleLoader(false); return; }
+        try {
+            const locStr = points.map(p => { const s = p.split(','); return `${s[1]},${s[0]}`; }).join(':');
+            const res = await fetch(`https://api.tomtom.com/routing/1/calculateRoute/${locStr}/json?key=${TOMTOM_API_KEY}&travelMode=truck&avoid=unpavedRoads&vehicleWeight=40000&vehicleCommercial=true&routeType=short&instructionsType=text&maxAlternatives=0`);
+            const data = await res.json();
+            
+            if (data.routes) {
+                draftRoutes = [];
+                const firstRouteDist = data.routes[0].summary.lengthInMeters / 1000;
+
+                data.routes.forEach((ttRoute, rIdx) => {
+                    const currentDist = ttRoute.summary.lengthInMeters / 1000;
+                    if (rIdx > 0 && (currentDist - firstRouteDist > 100)) return;
+
+                    const allCoords = ttRoute.legs.flatMap(leg => leg.points.map(p => [p.longitude, p.latitude]));
+                    const geoGeom = { type: "LineString", coordinates: allCoords };
+                    let routeGuidance = [];
+                    ttRoute.guidance.instructions.forEach((ins) => {
+                        routeGuidance.push({ roadNumbers: ins.roadNumbers || [], street: ins.street, pointIndex: ins.pointIndex, instruction: ins.message });
+                    });
+
+                    let rawSegments = [];
+                    let lastIdx = 0;
+                    for (let i = 0; i < routeGuidance.length; i++) {
+                        const current = routeGuidance[i];
+                        const next = routeGuidance[i + 1];
+                        const endIdx = next ? next.pointIndex : allCoords.length - 1;
+                        if (endIdx > lastIdx) {
+                            const segmentCoords = allCoords.slice(lastIdx, endIdx + 1);
+                            const name = getShortRoadName(current.roadNumbers, segmentCoords);
+                            const dist = turf.length(turf.lineString(segmentCoords), {units: 'kilometers'});
+                            rawSegments.push({ name, coords: segmentCoords, dist });
+                        }
+                        lastIdx = endIdx;
+                    }
+
+                    let consolidated = [];
+                    if (rawSegments.length > 0) {
+                        let cur = rawSegments[0];
+                        for (let i = 1; i < rawSegments.length; i++) {
+                            const nxt = rawSegments[i];
+                            if (nxt.dist < 1 || nxt.name === cur.name) {
+                                cur.coords.push(...nxt.coords.slice(1));
+                                cur.dist += nxt.dist;
+                            } else { consolidated.push(cur); cur = nxt; }
+                        }
+                        consolidated.push(cur);
+                    }
+
+                    let countryTotalDist = {};
+                    let grandTotalEur = 0;
+                    let countryEurSums = {};
+                    let grandTotalCzkFromTolls = 0;
+                    let countryOrder = [];
+                    
+                    consolidated.forEach((seg) => {
+                        const normalizedName = seg.name.replace(/\s+/g, '').toUpperCase();
+                        const isERoad = normalizedName.startsWith('E');
+                        const pt = seg.coords[0];
+                        const iso = getCountryByLatLng(pt[0], pt[1]) || "UNKNOWN";
+                        if (iso !== "UNKNOWN" && !countryOrder.includes(iso)) countryOrder.push(iso);
+
+                        const segLine = turf.lineString(seg.coords);
+                        const totalSegDist = turf.length(segLine, {units: 'kilometers'});
+                        const step = 2; 
+
+                        seg.tollValue = 0;
+
+                        if (totalSegDist > 18) {
+                            for (let d = 0; d < totalSegDist; d += step) {
+                                const miniDist = Math.min(step, totalSegDist - d);
+                                const samplePt = turf.along(segLine, d + (miniDist/2), {units: 'kilometers'});
+                                const sIso = getCountryByLatLng(samplePt.geometry.coordinates[0], samplePt.geometry.coordinates[1]) || "UNKNOWN";
+                                
+                                if(!countryTotalDist[sIso]) countryTotalDist[sIso] = 0;
+                                if(!countryEurSums[sIso]) countryEurSums[sIso] = 0;
+
+                                let rate = TOLL_RATES[sIso] || 0;
+
+                                if (sIso === "CZE") {
+                                    if (normalizedName.includes('D')) rate = TOLL_RATES["CZE_HWY"];
+                                    else if (CZ_TOLL_ROADS.some(r => normalizedName.includes(r))) rate = TOLL_RATES["CZE_1ST"];
+                                    else rate = TOLL_RATES["CZE_HWY"]; 
+                                    countryTotalDist[sIso] += miniDist;
+                                    const costCzk = miniDist * rate;
+                                    countryEurSums[sIso] += costCzk;
+                                    grandTotalCzkFromTolls += costCzk;
+                                    seg.tollValue += costCzk / CZK_RATE;
+                                } 
+                                else if (sIso === "FRA") {
+                                    let frRate = FR_SPECIFIC_TOLLS[normalizedName];
+                                    if (!frRate) {
+                                        const roadNum = normalizedName.match(/A\d+/);
+                                        if (roadNum && FR_SPECIFIC_TOLLS[roadNum[0]]) frRate = FR_SPECIFIC_TOLLS[roadNum[0]];
+                                    }
+                                    rate = frRate || TOLL_RATES["FRA"];
+                                    if (!(normalizedName.startsWith('A') || normalizedName.startsWith('E'))) rate = 0;
+                                    countryTotalDist[sIso] += miniDist;
+                                    const cost = miniDist * rate;
+                                    countryEurSums[sIso] += cost;
+                                    grandTotalEur += cost;
+                                    seg.tollValue += cost;
+                                }
+                                else {
+                                    if (!(isERoad || normalizedName.startsWith('D') || normalizedName.startsWith('A') || normalizedName.startsWith('S'))) rate = 0;
+                                    countryTotalDist[sIso] += miniDist;
+                                    const cost = miniDist * rate;
+                                    countryEurSums[sIso] += cost;
+                                    grandTotalEur += cost;
+                                    seg.tollValue += cost;
+                                }
+                            }
+                        } else {
+                            if(!countryTotalDist[iso]) countryTotalDist[iso] = 0;
+                            countryTotalDist[iso] += totalSegDist;
+                        }
+                    });
+
+                    let summaryItinerary = [];
+                    countryOrder.forEach(iso => { if (countryTotalDist[iso] > 0.5) summaryItinerary.push(iso); });
+
+                    let itinerarySegments = consolidated
+                        .filter(s => s.name && s.name.trim().length > 0 && s.dist > 1.5)
+                        .map(seg => {
+                            let sCountry = getCountryByLatLng(seg.coords[0][0], seg.coords[0][1]) || "UNK";
+                            let eCountry = getCountryByLatLng(seg.coords[seg.coords.length-1][0], seg.coords[seg.coords.length-1][1]) || "UNK";
+                            return { name: seg.name, startC: ISO_MAP[sCountry] || sCountry, endC: ISO_MAP[eCountry] || eCountry, isE: seg.name.startsWith('E'), toll: seg.tollValue, coords: seg.coords };
+                        });
+
+                    const totalDist = (ttRoute.summary.lengthInMeters / 1000).toFixed(1);
+                    const totalTollCzk = Math.round(grandTotalEur * CZK_RATE) + Math.round(grandTotalCzkFromTolls);
+
+                    let tollBreakdownHtml = "";
+                    for (const iso in countryEurSums) {
+                        if (countryEurSums[iso] > 0) {
+                            let val = iso === "CZE" ? `<b>${Math.round(countryEurSums[iso]).toLocaleString()} Kč</b>` : `<b>${countryEurSums[iso].toFixed(2)} €</b>`;
+                            tollBreakdownHtml += `<div style="display:flex; justify-content:space-between; font-size:12px; margin-top:4px;"><span>${ISO_MAP[iso] || iso}:</span>${val}</div>`;
+                        }
+                    }
+
+                    draftRoutes.push({ 
+                        geometry: geoGeom, 
+                        distance: parseFloat(totalDist), 
+                        travelTimeSeconds: ttRoute.summary.travelTimeInSeconds,
+                        travelTime: formatTomTomTime(ttRoute.summary.travelTimeInSeconds),
+                        countryOrder: summaryItinerary,
+                        name: "Varianta " + (rIdx + 1), 
+                        itineraryHtml: `Trasa přes: ${summaryItinerary.map(i => ISO_MAP[i] || i).join(', ')}`, 
+                        totalTollEur: grandTotalEur,
+                        totalTollCzk: totalTollCzk,
+                        tollBreakdownHtml, 
+                        segments: itinerarySegments, 
+                        guidance: routeGuidance 
+                    });
+                });
+
+                setActiveRoute(0);
+                document.getElementById('save-section').style.display = 'block';
+                map.fitBounds(L.geoJSON(draftRoutes[0].geometry).getBounds(), { padding: [50, 50] });
+            }
+        } catch (e) { console.error(e); } finally { toggleLoader(false); }
+    }
+
+    function setActiveRoute(idx) {
+        activeRouteIndex = idx;
+        draftRoute = draftRoutes[idx];
+        tomTomGuidance = draftRoute.guidance;
+        renderDraftOnMap(); 
+        renderInfoBox(); 
+        renderVariantBubbles();
+        renderMarkers();
+    }
+
+    function renderVariantBubbles() {
+        const container = document.getElementById('variant-container');
+        container.innerHTML = '<h1>Dostupné varianty</h1>';
+        draftRoutes.forEach((route, idx) => {
+            const bubble = document.createElement('div');
+            bubble.className = `variant-card ${idx === activeRouteIndex ? 'active' : ''}`;
+            bubble.onclick = () => setActiveRoute(idx);
+            let flagHtml = "";
+            route.countryOrder.forEach((iso, i) => {
+                const code = FLAG_ISO_MAP[iso] || "eu";
+                flagHtml += `<img src="https://flagcdn.com/w40/${code}.png" class="variant-flag-mini">`;
+                if (i < route.countryOrder.length - 1) flagHtml += `<span class="variant-arrow">›</span>`;
+            });
+            
+            const currentKmRate = parseFloat(document.getElementById('km-rate-input')?.value || KM_RATE);
+            const ldmVal = parseInt(document.getElementById('ldm-input')?.value || 13);
+            const marginVal = parseFloat(document.getElementById('margin-input')?.value || 0);
+            
+            const baseCost = (route.distance * currentKmRate) + route.totalTollCzk;
+            const withMargin = baseCost * (1 + (marginVal / 100));
+            const finalPrice = withMargin * (LDM_COEFFICIENTS[ldmVal] || 1);
+
+            bubble.innerHTML = `<div class="variant-title">${route.name}</div><div class="variant-flags">${flagHtml}</div><div class="variant-stats"><div><div class="variant-time">${route.travelTime}</div><div class="variant-dist">${route.distance} km</div></div><div class="variant-price">${Math.round(finalPrice).toLocaleString()} Kč</div></div>`;
+            container.appendChild(bubble);
+        });
+    }
+
+    function renderDraftOnMap() {
+        if (!draftRoutes.length) return;
+        draftLayer.clearLayers();
+        draftRoutes.forEach((route, idx) => {
+            if (idx === activeRouteIndex) return;
+            L.geoJSON(route.geometry, { style: { color: '#94a3b8', weight: 4, opacity: 0.35 }, interactive: true }).on('click', () => setActiveRoute(idx)).addTo(draftLayer);
+        });
+
+        if (viewMode === 'clean') {
+            L.geoJSON(draftRoute.geometry, { style: { color: '#1d4ed8', weight: 6, opacity: 0.95 } }).addTo(draftLayer);
+        } else if (draftRoute.segments && draftRoute.segments.length > 0) {
+            let toggle = true;
+            draftRoute.segments.forEach(seg => {
+                const color = toggle ? '#1d4ed8' : '#491DD8';
+                L.geoJSON({ type: "LineString", coordinates: seg.coords }, { style: { color: color, weight: 6, opacity: 0.85 } }).addTo(draftLayer);
+                if (seg.name) {
+                    const midPt = seg.coords[Math.floor(seg.coords.length / 2)];
+                    L.marker([midPt[1], midPt[0]], { icon: L.divIcon({ className: 'road-label', html: seg.name, iconSize: null, iconAnchor: [0, 15] }), interactive: false }).addTo(draftLayer);
+                    if (seg.startC === "FR" && seg.toll > 0) {
+                        L.marker([midPt[1], midPt[0]], { icon: L.divIcon({ className: 'toll-label', html: seg.toll.toFixed(2) + " €", iconSize: null, iconAnchor: [0, -5] }), interactive: false }).addTo(draftLayer);
+                    }
+                }
+                toggle = !toggle;
+            });
+        }
+    }
+
+    function calculateETA() {
+        if (!draftRoute) return;
+
+        const tensLeft = parseInt(document.getElementById('tens-left-input').value) || 0;
+        const ninesLeft = parseInt(document.getElementById('nines-left-input').value) || 0;
+        const unloadingHours = parseFloat(document.getElementById('unloading-input').value) || 0;
+
+        let totalDrivingSec = draftRoute.travelTimeSeconds;
+        let totalElapsedSec = 0; 
+        
+        let logParts = [];
+
+        // Přičteme vykládky na začátek (nebo k celku)
+        if (unloadingHours > 0) {
+            totalElapsedSec += unloadingHours * 3600;
+            logParts.push(`Vykládky ${unloadingHours}h`);
+        }
+
+        let remainingDrivingSec = totalDrivingSec;
+        let dayDrivingSec = 0;
+        let usedTens = 0;
+        let usedNines = 0;
+        let continuousDrivingSec = 0;
+
+        while (remainingDrivingSec > 0) {
+            // Kolik můžeme ujet v tomto bloku (max do 4.5h čistého času)
+            let driveInThisBlock = Math.min(remainingDrivingSec, (4.5 * 3600) - continuousDrivingSec);
+            
+            // Kolik zbývá do konce výkonu dne (9h nebo 10h)
+            let maxDayDriving = (usedTens < tensLeft) ? 10 * 3600 : 9 * 3600;
+            let driveInThisDay = maxDayDriving - dayDrivingSec;
+            
+            // Reálně ujedeme to, co nastane dříve
+            let actualStep = Math.min(driveInThisBlock, driveInThisDay);
+
+            remainingDrivingSec -= actualStep;
+            totalElapsedSec += actualStep;
+            dayDrivingSec += actualStep;
+            continuousDrivingSec += actualStep;
+
+            if (remainingDrivingSec <= 0) {
+                let h = Math.floor(actualStep / 3600);
+                let m = Math.round((actualStep % 3600) / 60);
+                logParts.push(`Jízda ${h}:${m.toString().padStart(2, '0')}h`);
+                break;
+            }
+
+            // Pokud jsme narazili na 4.5h limit
+            if (continuousDrivingSec >= 4.5 * 3600) {
+                logParts.push(`Jízda 4:30h`);
+                // Ale pozor, jestli to není zároveň konec dne
+                if (dayDrivingSec >= maxDayDriving) {
+                    // Konec dne
+                    if (usedTens < tensLeft && maxDayDriving === 10 * 3600) usedTens++;
+                    let rest = (usedNines < ninesLeft) ? 9 : 11;
+                    if (usedNines < ninesLeft) usedNines++;
+                    
+                    totalElapsedSec += rest * 3600;
+                    logParts.push(`Odpočinek ${rest}h`);
+                    dayDrivingSec = 0;
+                    continuousDrivingSec = 0;
+                } else {
+                    // Jen pauza 45 min
+                    totalElapsedSec += 45 * 60;
+                    logParts.push(`Přestávka 45m`);
+                    continuousDrivingSec = 0;
+                }
+            } 
+            // Pokud jsme narazili na limit dne dříve než na 4.5h (např. jeli jsme 1h po pauze a skončil výkon)
+            else if (dayDrivingSec >= maxDayDriving) {
+                let h = Math.floor(actualStep / 3600);
+                let m = Math.round((actualStep % 3600) / 60);
+                logParts.push(`Jízda ${h}:${m.toString().padStart(2, '0')}h`);
+
+                if (usedTens < tensLeft && maxDayDriving === 10 * 3600) usedTens++;
+                let rest = (usedNines < ninesLeft) ? 9 : 11;
+                if (usedNines < ninesLeft) usedNines++;
+                
+                totalElapsedSec += rest * 3600;
+                logParts.push(`Odpočinek ${rest}h`);
+                dayDrivingSec = 0;
+                continuousDrivingSec = 0;
+            }
+        }
+
+        const now = new Date();
+        const etaDate = new Date(now.getTime() + totalElapsedSec * 1000);
+        
+        const days = ["Ne", "Po", "Út", "St", "Čt", "Pá", "So"];
+        const dayStr = days[etaDate.getDay()];
+        const timeStr = etaDate.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = etaDate.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
+
+        document.getElementById('res-eta').innerHTML = `${dayStr} ${dateStr} v <b>${timeStr}</b>`;
+        
+        const totalH = Math.floor(totalElapsedSec / 3600);
+        const totalM = Math.floor((totalElapsedSec % 3600) / 60);
+        
+        document.getElementById('res-calc-log').innerText = logParts.join(' ➔ ');
+        document.getElementById('res-total-elapsed').innerText = `Celkový čas: ${totalH}h ${totalM}m`;
+    }
+
+    function updateCalculations() {
+        if (!draftRoute) return;
+        
+        const currentKmRate = parseFloat(document.getElementById('km-rate-input').value || 0);
+        const ldmVal = parseInt(document.getElementById('ldm-input').value || 13);
+        const marginVal = parseFloat(document.getElementById('margin-input').value || 0);
+        
+        const distCost = draftRoute.distance * currentKmRate;
+        const baseCost = distCost + draftRoute.totalTollCzk;
+        const withMargin = baseCost * (1 + (marginVal / 100));
+        const ldmCoef = LDM_COEFFICIENTS[ldmVal] || 1.0;
+        const finalPrice = withMargin * ldmCoef;
+
+        document.getElementById('res-dist-cost').innerText = Math.round(distCost).toLocaleString() + ' Kč';
+        document.getElementById('res-final-price').innerText = Math.round(finalPrice).toLocaleString() + ' Kč';
+        
+        calculateETA();
+        renderVariantBubbles();
+    }
+
+    function renderInfoBox() {
+        if (!draftRoute) return;
+        let itiHtml = '<div class="itinerary-box">';
+        if (draftRoute.segments && draftRoute.segments.length > 0) {
+            let countryGroups = {};
+            draftRoute.segments.forEach(seg => {
+                if (seg.isE && seg.startC !== seg.endC) {
+                    Object.keys(countryGroups).forEach(c => {
+                        itiHtml += `<div class="itinerary-row"><span class="itinerary-label">${c}:</span><span>${[...new Set(countryGroups[c])].join(' - ')}</span></div>`;
+                    });
+                    countryGroups = {};
+                    itiHtml += `<div class="itinerary-row"><div class="itinerary-cross"><span>${seg.startC}</span> ➔ <span>${seg.endC}:</span> <span style="color:#0f172a">${seg.name}</span></div></div>`;
+                } else {
+                    if (!countryGroups[seg.startC]) countryGroups[seg.startC] = [];
+                    countryGroups[seg.startC].push(seg.name);
+                }
+            });
+            Object.keys(countryGroups).forEach(c => { itiHtml += `<div class="itinerary-row"><span class="itinerary-label">${c}:</span><span>${[...new Set(countryGroups[c])].join(' - ')}</span></div>`; });
+        }
+        itiHtml += '</div>';
+
+        const infoContent = `
+            <div style="margin-bottom: 15px;">
+                <div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:800;">${draftRoute.name} - AKTIVNÍ</div>
+                <div style="font-size:28px; font-weight:600; color:#0f172a;">${draftRoute.distance} <span style="font-size:16px; color:#94a3b8;">km</span></div>
+                <div style="font-size:14px; font-family: 'IBM Plex Mono'; font-weight: 700; color: var(--accent); margin-top: -5px;">Čistý čas jízdy: ${draftRoute.travelTime}</div>
+            </div>
+
+            <div style="background: #f0f7ff; border: 1px solid var(--accent-light); border-radius: 8px; padding: 12px; margin-bottom: 15px;">
+                <div style="font-size:10px; color:var(--accent); text-transform:uppercase; font-weight:800; margin-bottom:8px;">Plánování dle 561/2006</div>
+                <div class="calc-input-row" style="margin-bottom: 8px;">
+                    <div class="calc-field">
+                        <label>Zbývá 10h</label>
+                        <input type="number" id="tens-left-input" value="2" min="0" max="2" oninput="calculateETA()">
+                    </div>
+                    <div class="calc-field">
+                        <label>Zbývá 9h (odp.)</label>
+                        <input type="number" id="nines-left-input" value="3" min="0" max="3" oninput="calculateETA()">
+                    </div>
+                    <div class="calc-field">
+                        <label>Vykládka (h)</label>
+                        <input type="number" id="unloading-input" value="0" step="0.5" oninput="calculateETA()">
+                    </div>
+                </div>
+                <div style="font-size:13px; font-weight:600; color:var(--dark);">Nejdřívější příjezd:</div>
+                <div id="res-eta" style="font-size:16px; color:var(--accent); font-weight:700;">--:--</div>
+                <div id="res-calc-log" style="font-size:9px; color:#94a3b8; margin-top:8px; line-height:1.3; font-family:'IBM Plex Mono';"></div>
+                <div id="res-total-elapsed" style="font-size:10px; color:#64748b; margin-top:2px; font-weight:600;">Celkový čas: --</div>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:600;">ITINERÁŘ TRASY</div>
+                ${itiHtml}
+            </div>
+
+            <div style="border-top:1px solid #f1f5f9; padding-top:12px; margin-top:12px;">
+                <div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:600;">ROZPIS NÁKLADŮ</div>
+                <div style="display:flex; justify-content:space-between; font-size:12px; margin-top:8px;">
+                    <span>Fixní náklady:</span><b id="res-dist-cost">0 Kč</b>
+                </div>
+                ${draftRoute.tollBreakdownHtml || 'Bez mýta'}
+            </div>
+
+            <div class="calc-input-row" style="margin-top: 15px;">
+                <div class="calc-field">
+                    <label>Náklad/km</label>
+                    <input type="number" id="km-rate-input" value="${KM_RATE}" oninput="updateCalculations()">
+                </div>
+                <div class="calc-field">
+                    <label>LDM (1-13)</label>
+                    <input type="number" id="ldm-input" value="0" min="1" max="13" oninput="updateCalculations()">
+                </div>
+                <div class="calc-field">
+                    <label>Marže %</label>
+                    <input type="number" id="margin-input" value="0" oninput="updateCalculations()">
+                </div>
+            </div>
+            
+            <div style="border-top:2px solid var(--dark); padding-top:12px; margin-top:12px;">
+                <div style="display:flex; justify-content:space-between; font-size:16px; font-weight:800;">
+                    <span>VÝSLEDNÁ CENA:</span>
+                    <span id="res-final-price" style="color:var(--success);">0 Kč</span>
+                </div>
+            </div>`;
+
+        document.getElementById('route-info').innerHTML = infoContent;
+        document.getElementById('route-info').style.display = 'block';
+        updateCalculations();
+    }
+
+    function takeScreenshot() {
+        if (!draftRoute) return alert("Nejdříve vygeneruj trasu!");
+        const modal = document.getElementById('screenshot-selector-modal');
+        const container = document.getElementById('country-screenshot-list');
+        container.innerHTML = '';
+        draftRoute.countryOrder.forEach(iso => {
+            const btn = document.createElement('button');
+            btn.className = 'btn-country-select';
+            const flagCode = FLAG_ISO_MAP[iso] || "eu";
+            btn.innerHTML = `<img src="https://flagcdn.com/w40/${flagCode}.png" style="width:24px; border:1px solid #eee"> <span>Zobrazit úsek: <b>${ISO_MAP[iso] || iso}</b></span>`;
+            btn.onclick = () => proceedWithScreenshot(iso);
+            container.appendChild(btn);
+        });
+        modal.style.display = 'flex';
+    }
+
+    async function proceedWithScreenshot(mode) {
+        document.getElementById('screenshot-selector-modal').style.display = 'none';
+        toggleLoader(true, "Připravuji snímek...");
+        
+        if (mode === 'all') {
+            map.fitBounds(L.geoJSON(draftRoute.geometry).getBounds(), { padding: [50, 50] });
+        } else {
+            const countryFeature = worldGeoJSON.features.find(f => {
+                const code = f.properties.ISO_A3 || f.properties.iso_a3;
+                return code === mode;
+            });
+            
+            if (countryFeature) {
+                const pointsInside = [];
+                draftRoute.geometry.coordinates.forEach(coord => {
+                    if (turf.booleanPointInPolygon(turf.point(coord), countryFeature)) {
+                        pointsInside.push(coord);
+                    }
+                });
+
+                if (pointsInside.length > 1) {
+                    const lineInside = turf.lineString(pointsInside);
+                    const bbox = turf.bbox(lineInside);
+                    
+                    if (mode === "FRA") {
+                        bbox[0] = Math.max(bbox[0], -5.5); 
+                        bbox[1] = Math.max(bbox[1], 41.0); 
+                        bbox[2] = Math.min(bbox[2], 10.0); 
+                        bbox[3] = Math.min(bbox[3], 51.5); 
+                    }
+
+                    const corner1 = L.latLng(bbox[1], bbox[0]);
+                    const corner2 = L.latLng(bbox[3], bbox[2]);
+                    const bounds = L.latLngBounds(corner1, corner2);
+                    map.fitBounds(bounds, { padding: [80, 80] });
+                } else {
+                    map.fitBounds(L.geoJSON(countryFeature).getBounds(), { padding: [30, 30] });
+                }
+            } else {
+                map.fitBounds(L.geoJSON(draftRoute.geometry).getBounds(), { padding: [50, 50] });
+            }
+        }
+
+        setTimeout(() => { executeActualCapture(mode); }, 1500);
+    }
+
+    function executeActualCapture(modeLabel) {
+        const mapElement = document.getElementById('map-container');
+        const overlay = document.getElementById('screenshot-table-overlay');
+        
+        const tollLabels = document.querySelectorAll('.toll-label');
+        tollLabels.forEach(el => el.style.display = 'none');
+
+        let countriesData = {};
+        draftRoute.segments.forEach(seg => {
+            if (!countriesData[seg.startC]) countriesData[seg.startC] = new Set();
+            if (seg.name) countriesData[seg.startC].add(seg.name);
+        });
+        const displayLabel = modeLabel === 'all' ? 'CELKOVÁ' : (ISO_MAP[modeLabel] || modeLabel);
+        let tableHtml = `<div style="font-weight: 800; border-bottom: 2px solid #000; margin-bottom: 8px; font-size: 14px;">TRASA: ${displayLabel}</div>`;
+        Object.keys(countriesData).forEach(iso => {
+            tableHtml += `<div style="margin-bottom: 4px; font-size: 11px;"><b>${iso}:</b> ${Array.from(countriesData[iso]).join(' - ')}</div>`;
+        });
+        overlay.innerHTML = tableHtml;
+        overlay.style.display = 'block';
+
+        html2canvas(mapElement, {
+            useCORS: true,
+            allowTaint: false,
+            scale: 2, 
+            ignoreElements: (el) => el.id === 'map-view-controls' || el.id === 'route-info' || el.className.includes('leaflet-control') || el.id === 'screenshot-selector-modal'
+        }).then(canvas => {
+            overlay.style.display = 'none';
+            tollLabels.forEach(el => el.style.display = 'inline-flex');
+
+            const link = document.createElement('a');
+            link.download = `trasa_${displayLabel}_${draftRoute.distance}km.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            toggleLoader(false);
+        });
+    }
+
+    function archiveDraft() {
+        const dept = document.getElementById('targetDept').value.trim(); if(!dept || !draftRoute) return alert("Zadej dept.");
+        const finalPrice = document.getElementById('res-final-price').innerText;
+        savedRoutes.push({ id: Date.now(), dept, name: draftRoute.name, travelTime: draftRoute.travelTime, itineraryHtml: draftRoute.itineraryHtml, distance: draftRoute.distance, geom: encodePolyline(draftRoute.geometry.coordinates), wps: waypoints.map(w => ({ v: w.val, l: w.latlng })), tolls: { calculatedTotal: draftRoute.totalTollEur }, note: `Cena: ${finalPrice}`, preferred: false });
+        localStorage.setItem('route_db', JSON.stringify(savedRoutes)); refreshUI();
+        document.getElementById('save-section').style.display = 'none'; 
+        document.getElementById('variant-container').innerHTML = '';
+        document.getElementById('route-info').style.display = 'none';
+    }
+
+    function togglePreferred(id, e) { e.stopPropagation(); const r = savedRoutes.find(x => x.id === id); if(r) { r.preferred = !r.preferred; localStorage.setItem('route_db', JSON.stringify(savedRoutes)); refreshUI(); } }
+
+    function refreshUI() {
+        const f = document.getElementById('deptFilter').value.toLowerCase();
+        const full = document.getElementById('full-route-list'), filtered = savedRoutes.filter(r => r.dept.toLowerCase().includes(f));
+        full.innerHTML = `<div class="section"><h1>Archiv (${filtered.length})</h1><button class="btn btn-secondary" onclick="exportDatabase()" style="font-size:11px;">💾 EXPORT JSON</button></div>`;
+        filtered.forEach(r => {
+            const div = document.createElement('div'); div.className = 'route-item';
+            div.innerHTML = `<div class="star-toggle ${r.preferred ? 'active' : ''}" onclick="togglePreferred(${r.id}, event)">★</div><div onclick="previewSlim(${r.id})"><strong>${r.name}</strong><br><small>${r.distance} km | ${r.travelTime || ''} | Dept ${r.dept}</small></div><div style="display:flex; gap:5px; margin-top:8px;"><button class="btn-mini" onclick="openEditor(${r.id})">Detaily</button><button class="btn-mini" style="color:var(--danger); background: #fff1f2; border-color: #fecdd3;" onclick="deleteRoute(${r.id})">Smazat</button></div>`;
+            full.appendChild(div);
+        });
+    }
+
+    function previewSlim(id) {
+        const r = savedRoutes.find(x => x.id === id); if(!r) return;
+        draftLayer.clearLayers(); markerLayer.clearLayers();
+        const coords = decodePolyline(r.geom), l = L.polyline(coords.map(c => [c[1], c[0]]), { color: '#1d4ed8', weight: 5 }).addTo(draftLayer);
+        if (r.wps) r.wps.forEach((wp, idx) => { if (wp.l) { 
+            let mCls = idx === 0 ? "start" : (idx === r.wps.length - 1 ? "end" : "mid");
+            L.marker([wp.l.lat, wp.l.lng], { icon: L.divIcon({ className: `wp-number-icon ${mCls}`, html: `<span>${idx+1}</span>`, iconSize: [24, 24], iconAnchor: [12, 12] }), interactive: false }).addTo(markerLayer);
+        } });
+        document.getElementById('route-info').innerHTML = `<div style="margin-bottom: 10px;"><div style="font-size:11px; color:#64748b;">Vzdálenost a čas</div><div style="font-size:24px; font-weight:600;">${r.distance} km</div><div style="color:var(--accent); font-weight:700;">${r.travelTime || ''}</div></div><div style="font-size:13px; color:#1e293b; margin-top:15px;">${r.itineraryHtml || ''}</div><div style="font-size:12px; margin-top:10px; padding:10px; background:#f1f5f9; border-radius:6px;">${r.note || ''}</div>`;
+        document.getElementById('route-info').style.display = 'block'; map.fitBounds(l.getBounds(), { padding: [50, 50] });
+    }
+
+    function openEditor(id) { const r = savedRoutes.find(x => x.id === id); if(!r) return; document.getElementById('edit-id').value = r.id; document.getElementById('edit-name').value = r.name; document.getElementById('edit-note').value = r.note || ''; document.getElementById('editor-modal').style.display = 'flex'; }
+    function saveEdit() { const id = document.getElementById('edit-id').value, r = savedRoutes.find(x => x.id == id); if(r) { r.name = document.getElementById('edit-name').value; r.note = document.getElementById('edit-note').value; localStorage.setItem('route_db', JSON.stringify(savedRoutes)); closeEditor(); refreshUI(); } }
+    function deleteRoute(id) { if(confirm("Smazat?")) { savedRoutes = savedRoutes.filter(r => r.id !== id); localStorage.setItem('route_db', JSON.stringify(savedRoutes)); refreshUI(); document.getElementById('route-info').style.display = 'none'; } }
+    function closeEditor() { document.getElementById('editor-modal').style.display = 'none'; }
+    function exportDatabase() { const blob = new Blob([JSON.stringify(savedRoutes, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'routes.json'; link.click(); }
+    function toggleLoader(s, text = "") { const l = document.getElementById('loader'); if(text) l.innerText = text; l.style.display = s ? 'block' : 'none'; }
+
+    function addWaypoint() { 
+        const newWp = { id: Date.now(), val: '', latlng: null, lastSelected: '', isLocked: false };
+        const insertIdx = waypoints.length - 1;
+        waypoints.splice(insertIdx, 0, newWp); renderWaypoints();
+        const newRow = document.getElementById(`wp-wrapper-${newWp.id}`);
+        if(newRow) newRow.classList.add('new-spawn');
+        renderMarkers();
+    }
+
+    function removeWp(i) { 
+        if (waypoints.length <= 2) return;
+        const container = document.getElementById('waypoint-container');
+        const row = container.children[i];
+        if (row) { row.classList.add('removing'); setTimeout(() => { waypoints.splice(i, 1); renderWaypoints(); renderMarkers(); }, 250); }
+    }
+    loadBoundaries(); renderWaypoints(); renderMarkers(); refreshUI();
+</script>
+</body>
+</html>
