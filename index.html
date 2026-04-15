@@ -14,7 +14,7 @@
         body { margin: 0; font-family: 'IBM Plex Sans', sans-serif; display: flex; height: 100vh; overflow: hidden; background: var(--bg); }
         
         #panel { width: 420px; border-right: 1px solid var(--border); background: white; display: flex; flex-direction: column; z-index: 1000; box-shadow: 4px 0 15px rgba(0,0,0,0.05); }
-        .tab-nav { background: var(--dark); padding: 15px; color: white; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 1px; }
+        .tab-nav { background: var(--dark); padding: 15px; color: white; font-family: 'IBM Plex Mono', monospace; font-size: 20px; letter-spacing: 1px; text-align: center; font-weight: 1000; }
         .tab-content { display: flex; flex-direction: column; flex-grow: 1; overflow-y: auto; }
         .section { padding: 20px; border-bottom: 1px solid var(--border); }
         
@@ -95,17 +95,43 @@
 
         #editor-modal, #screenshot-selector-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 2000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(2px); }
         .modal-box { background: white; width: 340px; padding: 25px; border-radius: 12px; }
-        #loader { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--dark); color: white; padding: 8px 20px; border-radius: 30px; font-size: 12px; display: none; z-index: 10000; }
-        
-        .route-item { padding: 12px 60px 12px 20px; border-bottom: 1px solid var(--border); position: relative; cursor: pointer; transition: background 0.2s; }
-        .route-item:hover { background: #f8fafc; }
-        .btn-mini { padding: 4px 8px; font-size: 10px; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; font-weight: 600; }
-        .star-toggle { position: absolute; top: 0; right: 0; bottom: 0; width: 60px; display: flex; align-items: center; justify-content: center; font-size: 26px; cursor: pointer; color: #cbd5e1; transition: 0.2s; user-select: none; }
-        .star-toggle.active { color: var(--gold); }
+        #loader {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.9); /* tmavý moderní podklad */
+    backdrop-filter: blur(8px);       /* rozmazání mapy pod loaderem */
+    color: #fff;
+    padding: 1rem 2rem;
+    border-radius: 1rem;
+    z-index: 9999;
+    font-weight: 600;
+    text-align: center;
+    font-color: white;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: opacity 0.5s ease, visibility 0.5s ease; /* pro fade-out */
+}
 
-        .flag-input-group { position: relative; flex: 1; }
-        .flag-input-group input { width: 100%; padding: 8px 8px 8px 34px !important; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; font-size: 13px; }
-        .flag-img { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 18px; height: auto; border: 1px solid #eee; box-shadow: 0 1px 2px rgba(0,0,0,0.05); pointer-events: none; }
+/* Elegantní animovaný spinner nad textem */
+#loader::before {
+    content: "";
+    display: block;
+    width: 30px;
+    height: 30px;
+    margin: 0 auto 1rem auto;
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    border-top: 3px solid #60a5fa; /* barva accent-light */
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
 
         #filter-section { padding: 15px 20px; background: #fff; border-top: 1px solid var(--border); }
         .filter-input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; box-sizing: border-box; outline: none; }
@@ -178,6 +204,18 @@
         .calc-field label { font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; }
         .calc-field input { padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; outline: none; width: 100%; box-sizing: border-box; }
         .calc-field input:focus { border-color: var(--accent); }
+
+/* ÚPLNÉ A DOČASNÉ SKRYTÍ CELÉHO ARCHIVU */
+#save-section, 
+#filter-section, 
+#full-route-list { 
+    display: none !important; 
+}
+
+/* Skrytí nadpisu "Archiv" a exportu, které se generují uvnitř */
+#full-route-list .section {
+    display: none !important;
+}
     </style>
 </head>
 <body>
@@ -223,7 +261,7 @@
 </div>
 
 <div id="panel">
-    <div class="tab-nav">ADMINISTRACE (v2026.5 - TomTom Engine)</div>
+    <div class="tab-nav">MOSS ROUTE MANAGER</div>
     <div class="tab-content">
         <div class="section">
             <h1>Trasové body</h1>
@@ -317,11 +355,7 @@
     let viewMode = localStorage.getItem('route_view_mode') || 'clean'; 
 
     const map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([49.5, 12], 6);
-   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '© OpenStreetMap contributors',
-    crossOrigin: true
-}).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', crossOrigin: true }).addTo(map);
     let boundaryLayer = L.layerGroup().addTo(map);
     let draftLayer = L.layerGroup().addTo(map);
     let markerLayer = L.layerGroup().addTo(map);
@@ -574,7 +608,7 @@
         if (points.length < 2) { renderMarkers(); toggleLoader(false); return; }
         try {
             const locStr = points.map(p => { const s = p.split(','); return `${s[1]},${s[0]}`; }).join(':');
-            const res = await fetch(`https://api.tomtom.com/routing/1/calculateRoute/${locStr}/json?key=${TOMTOM_API_KEY}&travelMode=truck&avoid=unpavedRoads&vehicleWeight=40000&vehicleCommercial=true&routeType=short&instructionsType=text&maxAlternatives=0`);
+            const res = await fetch(`https://api.tomtom.com/routing/1/calculateRoute/${locStr}/json?key=${TOMTOM_API_KEY}&travelMode=truck&avoid=unpavedRoads&vehicleWeight=40000&vehicleCommercial=true&routeType=shortest&instructionsType=text&maxAlternatives=0`);
             const data = await res.json();
             
             if (data.routes) {
@@ -675,7 +709,7 @@
                                     seg.tollValue += cost;
                                 }
                                 else {
-                                    if (!(isERoad || normalizedName.startsWith('D') || normalizedName.startsWith('A') || normalizedName.startsWith('S'))) rate = 0;
+                                    if (!(isERoad || normalizedName.startsWith('D') || normalizedName.startsWith('A') || normalizedName.startsWith('M') || normalizedName.startsWith('S') || normalizedName.startsWith('B'))) rate = 0;
                                     countryTotalDist[sIso] += miniDist;
                                     const cost = miniDist * rate;
                                     countryEurSums[sIso] += cost;
@@ -990,7 +1024,7 @@
                 </div>
                 <div class="calc-field">
                     <label>LDM (1-13)</label>
-                    <input type="number" id="ldm-input" value="0" min="1" max="13" oninput="updateCalculations()">
+                    <input type="number" id="ldm-input" value="13" min="1" max="13" oninput="updateCalculations()">
                 </div>
                 <div class="calc-field">
                     <label>Marže %</label>
@@ -1149,7 +1183,28 @@
     function deleteRoute(id) { if(confirm("Smazat?")) { savedRoutes = savedRoutes.filter(r => r.id !== id); localStorage.setItem('route_db', JSON.stringify(savedRoutes)); refreshUI(); document.getElementById('route-info').style.display = 'none'; } }
     function closeEditor() { document.getElementById('editor-modal').style.display = 'none'; }
     function exportDatabase() { const blob = new Blob([JSON.stringify(savedRoutes, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'routes.json'; link.click(); }
-    function toggleLoader(s, text = "") { const l = document.getElementById('loader'); if(text) l.innerText = text; l.style.display = s ? 'block' : 'none'; }
+   function toggleLoader(show, text = "") {
+    const l = document.getElementById('loader');
+    if (text) l.innerText = text;
+
+    if (show) {
+        l.style.display = 'block';
+        // Krátký timeout, aby se transition stihl chytit
+        setTimeout(() => {
+            l.style.opacity = '1';
+            l.style.visibility = 'visible';
+        }, 10);
+    } else {
+        l.style.opacity = '0';
+        l.style.visibility = 'hidden';
+        // Počkáme na konec animace (500ms), než dáme display none
+        setTimeout(() => {
+            if (l.style.opacity === '0') {
+                l.style.display = 'none';
+            }
+        }, 500);
+    }
+}
 
     function addWaypoint() { 
         const newWp = { id: Date.now(), val: '', latlng: null, lastSelected: '', isLocked: false };
