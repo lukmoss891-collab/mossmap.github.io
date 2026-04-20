@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8" />
-    <title>MOSS Route Manager</title>
+    <title>Route Master - PRO Editor (TomTom Truck Logic)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -140,11 +140,11 @@
         .remove-wp-btn { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: none; border: none; color: var(--danger); cursor: pointer; font-size: 16px; flex-shrink: 0; }
         .placeholder-wp-btn { width: 24px; flex-shrink: 0; }
 
-        .itinerary-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #334155; }
-        .itinerary-row { border-bottom: 1px dashed #e2e8f0; padding: 4px 0; display: flex; flex-direction: column; gap: 2px; }
+        .itinerary-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #334155; }
+        .itinerary-row { border-bottom: 1px dashed #e2e8f0; padding: 3px 0; display: flex; flex-direction: row; align-items: baseline; gap: 4px; flex-wrap: wrap; }
         .itinerary-row:last-child { border-bottom: none; }
-        .itinerary-label { font-weight: 800; color: var(--dark); margin-right: 5px; }
-        .itinerary-cross { color: var(--accent); font-weight: 800; display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+        .itinerary-label { font-weight: 800; color: var(--dark); min-width: 28px; flex-shrink: 0; }
+        .itinerary-cross { color: var(--accent); font-weight: 800; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 
         #variant-container { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
         .variant-card { border: 1px solid var(--border); border-radius: 12px; padding: 15px; background: #fff; cursor: pointer; transition: 0.2s; position: relative; }
@@ -608,7 +608,7 @@
         if (points.length < 2) { renderMarkers(); toggleLoader(false); return; }
         try {
             const locStr = points.map(p => { const s = p.split(','); return `${s[1]},${s[0]}`; }).join(':');
-            const res = await fetch(`https://api.tomtom.com/routing/1/calculateRoute/${locStr}/json?key=${TOMTOM_API_KEY}&travelMode=truck&avoid=unpavedRoads&avoid=ferries&vehicleWeight=40000&vehicleCommercial=true&routeType=shortest&instructionsType=text&maxAlternatives=0`);
+            const res = await fetch(`https://api.tomtom.com/routing/1/calculateRoute/${locStr}/json?key=${TOMTOM_API_KEY}&travelMode=truck&avoid=unpavedRoads&vehicleWeight=40000&vehicleCommercial=true&routeType=shortest&instructionsType=text&maxAlternatives=0`);
             const data = await res.json();
             
             if (data.routes) {
@@ -797,9 +797,9 @@
             const marginVal = parseFloat(document.getElementById('margin-input')?.value || 0);
             
             const ldmCoef = LDM_COEFFICIENTS[ldmVal] || 1;
-            const targetTotalPrice = route.distance * currentKmRate * ldmCoef;
-            const fixedCost = Math.max(targetTotalPrice - route.totalTollCzk, 0);
-            const basePrice = fixedCost + route.totalTollCzk;
+            const fixedCost = route.distance * currentKmRate * ldmCoef;
+            const tollCost = route.totalTollCzk * ldmCoef;
+            const basePrice = fixedCost + tollCost;
             const finalPrice = basePrice * (1 + (marginVal / 100));
 
             bubble.innerHTML = `<div class="variant-title">${route.name}</div><div class="variant-flags">${flagHtml}</div><div class="variant-stats"><div><div class="variant-time">${route.travelTime}</div><div class="variant-dist">${route.distance} km</div></div><div class="variant-price">${Math.round(finalPrice).toLocaleString()} Kč</div></div>`;
@@ -944,14 +944,19 @@
         const marginVal = parseFloat(document.getElementById('margin-input').value || 0);
         
         const ldmCoef = LDM_COEFFICIENTS[ldmVal] || 1.0;
-        const targetTotalPrice = draftRoute.distance * currentKmRate * ldmCoef;
-        const fixedCost = Math.max(targetTotalPrice - draftRoute.totalTollCzk, 0);
-        const basePrice = fixedCost + draftRoute.totalTollCzk;
+        const fixedCost = draftRoute.distance * currentKmRate * ldmCoef;
+        const tollCost = draftRoute.totalTollCzk * ldmCoef;
+        const basePrice = fixedCost + tollCost;
         const finalPrice = basePrice * (1 + (marginVal / 100));
 
         const fixedCostEl = document.getElementById('res-dist-cost');
         if (fixedCostEl) {
             fixedCostEl.innerText = Math.round(fixedCost).toLocaleString() + ' Kč';
+        }
+
+        const tollTotalEl = document.getElementById('res-toll-total');
+        if (tollTotalEl) {
+            tollTotalEl.innerText = tollCost > 0 ? Math.round(tollCost).toLocaleString() + ' Kč' : 'Bez mýta';
         }
 
         document.getElementById('res-final-price').innerText = Math.round(finalPrice).toLocaleString() + ' Kč';
@@ -982,81 +987,87 @@
         itiHtml += '</div>';
 
         const infoContent = `
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:10px; border-bottom:2px solid #f1f5f9;">
                 <div>
-                    <div style="font-size:10px; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.5px;">${draftRoute.name} — AKTIVNÍ</div>
-                    <div style="font-size:26px; font-weight:700; color:#0f172a; line-height:1.1;">${draftRoute.distance} <span style="font-size:14px; color:#94a3b8; font-weight:400;">km</span></div>
+                    <div style="font-size:10px; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:1px;">Vzdálenost</div>
+                    <div style="font-size:26px; font-weight:700; color:#0f172a; line-height:1.1; font-family:'IBM Plex Mono';">${draftRoute.distance} <span style="font-size:13px; color:#94a3b8; font-weight:400;">km</span></div>
                 </div>
                 <div style="text-align:right;">
-                    <div style="font-size:10px; color:#94a3b8; text-transform:uppercase; font-weight:700;">Čas jízdy</div>
-                    <div style="font-size:16px; font-family:'IBM Plex Mono'; font-weight:700; color:var(--accent);">${draftRoute.travelTime}</div>
+                    <div style="font-size:10px; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:1px;">Čistý čas jízdy</div>
+                    <div style="font-size:20px; font-family:'IBM Plex Mono'; font-weight:700; color:var(--accent);">${draftRoute.travelTime}</div>
                 </div>
-            </div>
-
-            <div style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:10px;">
-                <div style="font-size:9px; color:var(--accent); text-transform:uppercase; font-weight:800; margin-bottom:6px; letter-spacing:0.5px;">AETR / 561-2006</div>
-                <div class="calc-input-row" style="margin-bottom:6px;">
-                    <div class="calc-field">
-                        <label>10h výkonů</label>
-                        <input type="number" id="tens-left-input" value="2" min="0" max="2" oninput="calculateETA()">
-                    </div>
-                    <div class="calc-field">
-                        <label>9h odpočinků</label>
-                        <input type="number" id="nines-left-input" value="3" min="0" max="3" oninput="calculateETA()">
-                    </div>
-                    <div class="calc-field">
-                        <label>Vykládka (h)</label>
-                        <input type="number" id="unloading-input" value="0" step="0.5" oninput="calculateETA()">
-                    </div>
-                </div>
-                <div style="display:flex; justify-content:space-between; align-items:baseline;">
-                    <div>
-                        <div style="font-size:9px; color:#64748b; font-weight:700; text-transform:uppercase;">Nejdřívější příjezd</div>
-                        <div id="res-eta" style="font-size:15px; color:var(--accent); font-weight:700;">--:--</div>
-                        <div id="res-total-elapsed" style="font-size:9px; color:#94a3b8; font-weight:600;">Celkový čas: --</div>
-                    </div>
-                </div>
-                <div id="res-calc-log" style="font-size:8px; color:#94a3b8; margin-top:4px; line-height:1.4; font-family:'IBM Plex Mono';"></div>
             </div>
 
             <div style="margin-bottom:10px;">
-                <div style="font-size:9px; color:#64748b; text-transform:uppercase; font-weight:700; letter-spacing:0.5px; margin-bottom:4px;">Itinerář trasy</div>
+                <div style="font-size:10px; color:#0f172a; text-transform:uppercase; font-weight:800; letter-spacing:1px; margin-bottom:6px; display:flex; align-items:center; gap:6px;"><span style="width:3px; height:11px; background:#0f172a; border-radius:2px; display:inline-block;"></span>Výpočet 561</div>
+                <div style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:8px 10px;">
+                    <div style="display:flex; gap:6px; margin-bottom:6px;">
+                        <div class="calc-field">
+                            <label>10h řízení</label>
+                            <input type="number" id="tens-left-input" value="2" min="0" max="2" oninput="calculateETA()">
+                        </div>
+                        <div class="calc-field">
+                            <label>9h odpočinek</label>
+                            <input type="number" id="nines-left-input" value="3" min="0" max="3" oninput="calculateETA()">
+                        </div>
+                        <div class="calc-field">
+                            <label>Jiná práce (h)</label>
+                            <input type="number" id="unloading-input" value="0" step="0.5" oninput="calculateETA()">
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #e2e8f0; padding-top:6px;">
+                        <div>
+                            <div style="font-size:10px; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Nejdřívější příjezd</div>
+                            <div id="res-eta" style="font-size:16px; color:var(--accent); font-weight:700; font-family:'IBM Plex Mono';">--:--</div>
+                        </div>
+                        <div id="res-total-elapsed" style="font-size:11px; color:#64748b; font-weight:600; text-align:right;">Celkový čas: --</div>
+                    </div>
+                    <div id="res-calc-log" style="font-size:9px; color:#94a3b8; margin-top:4px; line-height:1.5; font-family:'IBM Plex Mono';"></div>
+                </div>
+            </div>
+
+            <div style="margin-bottom:10px;">
+                <div style="font-size:10px; color:#0f172a; text-transform:uppercase; font-weight:800; letter-spacing:1px; margin-bottom:4px; display:flex; align-items:center; gap:6px;"><span style="width:3px; height:11px; background:#0f172a; border-radius:2px; display:inline-block;"></span>Itinerář trasy</div>
                 ${itiHtml}
             </div>
 
-            <div style="border-top:1px solid #f1f5f9; padding-top:10px; margin-top:4px; margin-bottom:8px;">
-                <div style="font-size:9px; color:#64748b; text-transform:uppercase; font-weight:700; letter-spacing:0.5px; margin-bottom:8px;">Rozpis nákladů</div>
-
-                <div style="background:#f0f7ff; border-left:3px solid var(--accent); border-radius:0 6px 6px 0; padding:6px 10px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:11px; font-weight:700; color:#1e293b;">Fixní náklady</span>
-                    <b id="res-dist-cost" style="font-size:12px; color:var(--accent);">0 Kč</b>
+            <div style="margin-bottom:10px;">
+                <div style="font-size:10px; color:#0f172a; text-transform:uppercase; font-weight:800; letter-spacing:1px; margin-bottom:6px; display:flex; align-items:center; gap:6px;"><span style="width:3px; height:11px; background:#0f172a; border-radius:2px; display:inline-block;"></span>Rozpis nákladů</div>
+                <div style="background:#f0f7ff; border-left:3px solid var(--accent); border-radius:0 6px 6px 0; padding:6px 12px; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:12px; font-weight:600; color:#334155;">Fixní náklady</span>
+                    <b id="res-dist-cost" style="font-size:13px; color:var(--accent); font-family:'IBM Plex Mono';">0 Kč</b>
                 </div>
-
-                <div style="background:#fff7ed; border-left:3px solid #f59e0b; border-radius:0 6px 6px 0; padding:6px 10px; margin-bottom:3px; display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:11px; font-weight:700; color:#1e293b;">Mýto celkem</span>
-                    <b id="res-toll-total" style="font-size:12px; color:#d97706;">${draftRoute.totalTollCzk ? Math.round(draftRoute.totalTollCzk).toLocaleString() + ' Kč' : 'Bez mýta'}</b>
+                <div style="background:#fff7ed; border-left:3px solid #f59e0b; border-radius:0 6px 6px 0; padding:6px 12px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:12px; font-weight:600; color:#334155;">Mýto celkem</span>
+                    <b id="res-toll-total" style="font-size:13px; color:#d97706; font-family:'IBM Plex Mono';">0 Kč</b>
                 </div>
                 ${draftRoute.tollBreakdownHtml ? draftRoute.tollBreakdownHtml : '<div style="font-size:10px; color:#94a3b8; padding-left:10px; margin-top:2px;">↳ Žádné mýto</div>'}
             </div>
 
-            <div class="calc-input-row" style="margin-top:8px;">
-                <div class="calc-field">
-                    <label>Cena/km</label>
-                    <input type="number" id="km-rate-input" value="${KM_RATE}" oninput="updateCalculations()">
-                </div>
-                <div class="calc-field">
-                    <label>LDM (1-13)</label>
-                    <input type="number" id="ldm-input" value="13" min="1" max="13" oninput="updateCalculations()">
-                </div>
-                <div class="calc-field">
-                    <label>Marže %</label>
-                    <input type="number" id="margin-input" value="0" oninput="updateCalculations()">
+            <div style="margin-bottom:10px;">
+                <div style="font-size:10px; color:#0f172a; text-transform:uppercase; font-weight:800; letter-spacing:1px; margin-bottom:6px; display:flex; align-items:center; gap:6px;"><span style="width:3px; height:11px; background:#0f172a; border-radius:2px; display:inline-block;"></span>Kalkulace</div>
+                <div style="display:flex; gap:6px;">
+                    <div class="calc-field">
+                        <label>Cena/km</label>
+                        <input type="number" id="km-rate-input" value="${KM_RATE}" oninput="updateCalculations()">
+                    </div>
+                    <div class="calc-field">
+                        <label>LDM (1–13)</label>
+                        <input type="number" id="ldm-input" value="13" min="1" max="13" oninput="updateCalculations()">
+                    </div>
+                    <div class="calc-field">
+                        <label>Marže %</label>
+                        <input type="number" id="margin-input" value="0" oninput="updateCalculations()">
+                    </div>
                 </div>
             </div>
-            
-            <div style="background:var(--dark); border-radius:8px; padding:10px 12px; margin-top:6px; display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:11px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">Výsledná cena</span>
-                <span id="res-final-price" style="font-size:20px; font-weight:800; color:#34d399;">0 Kč</span>
+
+            <div style="background:#0f172a; border-radius:8px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-size:12px; font-weight:800; color:#ffffff; text-transform:uppercase; letter-spacing:1px;">Výsledná cena</div>
+                    <div style="font-size:10px; color:#ffffff; margin-top:1px;">vč. mýta a marže</div>
+                </div>
+                <span id="res-final-price" style="font-size:22px; font-weight:800; color:#60a5fa; font-family:'IBM Plex Mono';">0 Kč</span>
             </div>`;
 
         document.getElementById('route-info').innerHTML = infoContent;
