@@ -624,6 +624,21 @@
                     let routeGuidance = [];
                     ttRoute.guidance.instructions.forEach((ins) => {
                         routeGuidance.push({ roadNumbers: ins.roadNumbers || [], street: ins.street, pointIndex: ins.pointIndex, instruction: ins.message });
+
+                        console.group(`TomTom route segments – varianta ${rIdx + 1}`);
+
+ttRoute.guidance.instructions.forEach((ins, idx) => {
+    console.log({
+        index: idx,
+        pointIndex: ins.pointIndex,
+        instruction: ins.message,
+        street: ins.street || null,
+        roadNumbers: ins.roadNumbers || [],
+        routeOffsetInMeters: ins.routeOffsetInMeters || null
+    });
+});
+
+console.groupEnd();
                     });
 
                     let rawSegments = [];
