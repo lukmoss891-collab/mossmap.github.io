@@ -608,7 +608,7 @@
         if (points.length < 2) { renderMarkers(); toggleLoader(false); return; }
         try {
             const locStr = points.map(p => { const s = p.split(','); return `${s[1]},${s[0]}`; }).join(':');
-            const res = await fetch(`https://api.tomtom.com/routing/1/calculateRoute/${locStr}/json?key=${TOMTOM_API_KEY}&travelMode=truck&avoid=unpavedRoads&avoid=ferries&vehicleWeight=40000&vehicleHeight=4.2&vehicleCommercial=true&routeType=fastest&instructionsType=text&maxAlternatives=0`);
+            const res = await fetch(`https://api.tomtom.com/routing/1/calculateRoute/${locStr}/json?key=${TOMTOM_API_KEY}&travelMode=truck&avoid=unpavedRoads&avoid=ferries&vehicleWeight=40000&vehicleHeight=4.2&vehicleCommercial=true&routeType=fastest&instructionsType=text&maxAlternatives=2`);
             const data = await res.json();
             
             if (data.routes) {
